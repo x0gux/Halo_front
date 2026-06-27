@@ -11,6 +11,10 @@ type Signal = "R" | "Y" | "G";
 //  예외: G → R 로 바뀌는 순간 사람이 인식되어 있으면 R 로 가지 않고
 //        Y(노랑)를 켜서 "사람이 사라질 때까지" 유지한다. 사람이 없어지면 R 로 전환.
 const CYCLE_MS = 10000; // 빨강/초록 점등 시간 (10초)
+// 노랑(Y) 유지 중, 사람이 이 시간만큼 "연속으로" 안 보여야 빨강으로 전환.
+// COCO-SSD 가 프레임마다 사람을 놓치는(깜빡이는) 것을 흡수해, 사람이
+// 다 건너서 더는 인식되지 않을 때까지 노랑이 유지되게 한다.
+const CLEAR_GRACE_MS = 2000;
 
 const SIGNAL_NAME: Record<Signal, string> = { R: "RED", Y: "YELLOW", G: "GREEN" };
 
@@ -24,6 +28,7 @@ export default function TrafficLightDetector() {
   // 상태 머신 내부 상태 (렌더와 분리하기 위해 ref 사용)
   const signalRef = useRef<Signal>("R");
   const phaseStartRef = useRef(0); // 현재 R/G 점등이 시작된 시각
+  const lastSeenRef = useRef(0); // 노랑 유지 중 마지막으로 사람이 보인 시각
   const lastFrameRef = useRef(0);
   const lastPostedRef = useRef<Signal | null>(null);
 
@@ -70,6 +75,7 @@ export default function TrafficLightDetector() {
           if (personPresent) {
             // 전환 순간 사람이 있으면 빨강 대신 노랑 유지
             applySignal("Y");
+            lastSeenRef.current = now;
           } else {
             applySignal("R");
             phaseStartRef.current = now;
@@ -82,8 +88,12 @@ export default function TrafficLightDetector() {
           phaseStartRef.current = now;
         }
       } else {
-        // Y(노랑): 사람이 사라질 때까지 유지, 없어지면 빨강으로
-        if (!personPresent) {
+        // Y(노랑): 사람이 다 건너서 인식이 안 될 때까지 계속 유지.
+        // 한 프레임 놓침(깜빡임)으로 꺼지지 않도록, CLEAR_GRACE_MS 동안
+        // 연속으로 사람이 안 보일 때만 빨강으로 전환한다.
+        if (personPresent) {
+          lastSeenRef.current = now;
+        } else if (now - lastSeenRef.current >= CLEAR_GRACE_MS) {
           applySignal("R");
           phaseStartRef.current = now;
         }
