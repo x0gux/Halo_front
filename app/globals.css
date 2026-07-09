@@ -66,17 +66,17 @@ code {
 }
 
 .app-shell {
-  width: min(1360px, calc(100% - 32px));
+  width: min(1400px, calc(100% - 20px));
   margin: 0 auto;
-  padding: var(--space-6) 0 var(--space-8);
+  padding: 10px 0 var(--space-4);
 }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
-  gap: var(--space-6);
+  grid-template-columns: minmax(0, 1.08fr) minmax(440px, 0.92fr);
+  gap: var(--space-3);
   align-items: stretch;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-3);
 }
 
 .hero-copy,
@@ -88,13 +88,14 @@ code {
 }
 
 .hero-copy {
-  padding: clamp(var(--space-5), 3vw, var(--space-8));
+  padding: var(--space-4) var(--space-5);
 }
 
 .hero-metrics {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-5);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
 }
 
 .eyebrow {
@@ -103,12 +104,12 @@ code {
   font-weight: 510;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-2);
 }
 
 .hero h1 {
-  max-width: 920px;
-  font-size: clamp(2.1rem, 4.4vw, 4rem);
+  max-width: 780px;
+  font-size: clamp(1.75rem, 3.4vw, 3.15rem);
   font-weight: 590;
   line-height: 1;
   letter-spacing: 0;
@@ -117,15 +118,16 @@ code {
 .hero p {
   max-width: 760px;
   color: var(--text-secondary);
-  font-size: 1rem;
-  margin-top: var(--space-4);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin-top: var(--space-3);
 }
 
 .metric-tile {
   display: grid;
   gap: var(--space-1);
-  min-height: 82px;
-  padding: var(--space-4);
+  min-height: 72px;
+  padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-soft);
@@ -139,7 +141,7 @@ code {
 
 .metric-tile strong {
   color: var(--text-primary);
-  font-size: clamp(1.5rem, 4vw, 2.3rem);
+  font-size: clamp(1.35rem, 2.5vw, 2rem);
   font-weight: 590;
   line-height: 1;
 }
@@ -167,9 +169,9 @@ code {
 
 .signal-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.72fr) minmax(300px, 0.88fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(230px, 0.66fr) minmax(300px, 0.86fr);
   grid-template-areas: "camera signal warning";
-  gap: var(--space-6);
+  gap: var(--space-3);
   align-items: start;
 }
 
@@ -177,7 +179,7 @@ code {
   position: relative;
   min-width: 0;
   overflow: hidden;
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--border-standard);
   border-radius: 12px;
   background:
@@ -202,8 +204,8 @@ code {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .panel-kicker {
@@ -216,7 +218,7 @@ code {
 
 .panel h2 {
   color: var(--text-primary);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 590;
   line-height: 1.2;
   letter-spacing: 0;
@@ -227,8 +229,8 @@ code {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 32px;
-  padding: 0 var(--space-3);
+  min-height: 30px;
+  padding: 0 var(--space-2);
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
   background: var(--surface-soft);
@@ -286,7 +288,7 @@ code {
 
 .camera-placeholder {
   position: absolute;
-  inset: var(--space-5);
+  inset: var(--space-4);
   display: grid;
   place-items: center;
   align-content: center;
@@ -301,8 +303,8 @@ code {
 .control-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .icon-button {
@@ -310,8 +312,8 @@ code {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 40px;
-  padding: 0 var(--space-4);
+  min-height: 36px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--border-standard);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.045);
@@ -367,16 +369,16 @@ code {
   align-items: center;
   gap: var(--space-2);
   min-height: 22px;
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .telemetry-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .telemetry-item {
@@ -384,8 +386,8 @@ code {
   grid-template-columns: auto 1fr;
   gap: var(--space-1) var(--space-2);
   align-items: center;
-  min-height: 84px;
-  padding: var(--space-4);
+  min-height: 68px;
+  padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-soft);
@@ -404,7 +406,7 @@ code {
 .telemetry-item strong {
   grid-column: 1 / -1;
   color: var(--text-primary);
-  font-size: 1.4rem;
+  font-size: 1.15rem;
   font-weight: 590;
   line-height: 1;
 }
@@ -413,7 +415,7 @@ code {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: var(--space-2);
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   color: var(--text-muted);
   font-size: 0.875rem;
 }
@@ -431,7 +433,7 @@ code {
 .car-signal-wrap {
   display: grid;
   justify-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .car-signal-header {
@@ -445,11 +447,11 @@ code {
 
 .traffic-light.vehicle {
   display: grid;
-  gap: var(--space-4);
-  width: min(168px, 100%);
-  padding: var(--space-4);
+  gap: var(--space-3);
+  width: min(136px, 100%);
+  padding: var(--space-3);
   border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 20px;
+  border-radius: 16px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 18%),
     linear-gradient(145deg, #1d2026, #08090a 72%);
@@ -463,7 +465,7 @@ code {
   position: relative;
   display: grid;
   place-items: center;
-  width: min(104px, 100%);
+  width: min(76px, 100%);
   aspect-ratio: 1;
   justify-self: center;
   border-radius: 50%;
@@ -511,8 +513,8 @@ code {
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: 44px;
-  padding: 0 var(--space-3);
+  min-height: 38px;
+  padding: 0 var(--space-2);
   border: 1px solid rgba(245, 184, 75, 0.38);
   border-radius: 8px;
   background: rgba(245, 184, 75, 0.11);
@@ -523,9 +525,9 @@ code {
 
 .signal-box {
   display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
-  padding: var(--space-4);
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: rgba(8, 9, 10, 0.52);
@@ -541,26 +543,26 @@ code {
 
 .signal-box code {
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 0.875rem;
 }
 
 .stat-list {
   display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
+  gap: var(--space-1);
+  margin-top: var(--space-2);
 }
 
 .stat-list div {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
   border-top: 1px solid var(--border-subtle);
 }
 
 .stat-list strong {
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 590;
   text-align: right;
 }
@@ -580,7 +582,7 @@ code {
 .warning-copy {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid rgba(255, 93, 93, 0.22);
   border-radius: 8px;
   background:
@@ -590,27 +592,28 @@ code {
 
 .warning-copy strong {
   color: #ffffff;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   font-weight: 590;
 }
 
 .warning-copy p {
   color: var(--text-secondary);
-  font-size: 0.925rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 
 .fatality-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .fatality-grid div {
   display: grid;
   gap: var(--space-1);
-  min-height: 78px;
-  padding: var(--space-3);
+  min-height: 62px;
+  padding: var(--space-2);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-soft);
@@ -618,9 +621,223 @@ code {
 
 .fatality-grid strong {
   color: var(--text-primary);
-  font-size: 1.35rem;
+  font-size: 1.05rem;
   font-weight: 590;
   line-height: 1;
+}
+
+@media (min-width: 1181px) and (max-height: 820px) {
+  .app-shell {
+    width: min(1420px, calc(100% - 16px));
+    padding: 8px 0;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .hero-copy {
+    display: grid;
+    align-content: center;
+    padding: 12px 16px;
+  }
+
+  .hero-metrics {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .eyebrow {
+    margin-bottom: 6px;
+    font-size: 0.6875rem;
+  }
+
+  .hero h1 {
+    max-width: 760px;
+    font-size: clamp(1.7rem, 3vw, 2.45rem);
+    line-height: 1.02;
+  }
+
+  .hero p {
+    display: none;
+  }
+
+  .metric-tile {
+    min-height: 54px;
+    padding: 8px;
+  }
+
+  .metric-tile span,
+  .metric-tile code {
+    font-size: 0.6875rem;
+  }
+
+  .metric-tile strong {
+    font-size: 1.3rem;
+  }
+
+  .signal-workspace {
+    grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.62fr) minmax(330px, 0.9fr);
+    gap: 10px;
+  }
+
+  .panel {
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  .panel-header {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .panel-kicker {
+    font-size: 0.6875rem;
+  }
+
+  .panel h2 {
+    font-size: 1.0625rem;
+  }
+
+  .live-pill,
+  .signal-chip {
+    min-height: 26px;
+    font-size: 0.6875rem;
+  }
+
+  .video-frame {
+    aspect-ratio: 2.28 / 1;
+    border-radius: 10px;
+  }
+
+  .camera-placeholder {
+    inset: 12px;
+    gap: 8px;
+  }
+
+  .control-row {
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .icon-button {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.8125rem;
+  }
+
+  .system-status {
+    min-height: 18px;
+    margin-top: 8px;
+    font-size: 0.75rem;
+  }
+
+  .telemetry-grid {
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .telemetry-item {
+    min-height: 50px;
+    padding: 8px;
+  }
+
+  .telemetry-item span {
+    font-size: 0.6875rem;
+  }
+
+  .telemetry-item strong {
+    font-size: 1rem;
+  }
+
+  .range-control {
+    gap: 4px 8px;
+    margin-top: 8px;
+    font-size: 0.75rem;
+  }
+
+  .car-signal-wrap {
+    gap: 8px;
+  }
+
+  .car-signal-header {
+    font-size: 0.6875rem;
+  }
+
+  .traffic-light.vehicle {
+    width: 112px;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  .lamp {
+    width: min(62px, 100%);
+    font-size: 0.6875rem;
+  }
+
+  .vulnerable-notice {
+    min-height: 32px;
+    font-size: 0.8125rem;
+  }
+
+  .signal-box {
+    gap: 4px;
+    margin-top: 8px;
+    padding: 8px;
+  }
+
+  .signal-box span,
+  .stat-list span,
+  .fatality-grid span {
+    font-size: 0.6875rem;
+  }
+
+  .signal-box code {
+    font-size: 0.8125rem;
+  }
+
+  .stat-list {
+    margin-top: 6px;
+  }
+
+  .stat-list div {
+    padding: 5px 0;
+  }
+
+  .stat-list strong {
+    font-size: 0.75rem;
+  }
+
+  .warning-copy {
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .warning-copy strong {
+    font-size: 0.9375rem;
+  }
+
+  .warning-copy p {
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+
+  .fatality-grid {
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .fatality-grid div {
+    min-height: 50px;
+    padding: 8px;
+  }
+
+  .fatality-grid strong {
+    font-size: 0.9375rem;
+  }
 }
 
 @media (max-width: 1180px) {

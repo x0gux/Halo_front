@@ -40,7 +40,7 @@ Halo Signal is a compact safety command center. The signature is a dark, automot
 
 | Level | Size | Weight | Line Height | Tracking | Usage |
 |-------|------|--------|-------------|----------|-------|
-| Display | `clamp(2.4rem, 6vw, 5.5rem)` | 590 | 0.95 | 0 | Main headline |
+| Display | `clamp(1.75rem, 3.4vw, 3.15rem)` | 590 | 1 | 0 | Demo headline |
 | H1 | `2rem` | 590 | 1.1 | 0 | Section title |
 | H2 | `1.5rem` | 590 | 1.2 | 0 | Panel title |
 | H3 | `1.125rem` | 590 | 1.35 | 0 | Card title |
@@ -81,7 +81,7 @@ All spacing derives from a base of 4px.
 ### Grid
 
 - Max content width: 1360px.
-- Main workspace: responsive two-column grid, camera and signal panels visible together on desktop.
+- Main workspace: three-column laptop demo grid so camera, car signal, and TTS warning are visible together at 1366x768.
 - Mobile: single-column stack with signal first after the hero stats.
 
 ## 5. Components
