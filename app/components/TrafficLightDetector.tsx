@@ -26,6 +26,371 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import styled from "@emotion/styled";
+
+// Styled components for glassmorphism UI
+const FullscreenContainer = styled.div`
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(113, 112, 255, 0.15), transparent 30%),
+    radial-gradient(circle at 85% 80%, rgba(48, 209, 88, 0.12), transparent 35%),
+    linear-gradient(135deg, #0a0b0d 0%, #0f1115 50%, #08090a 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  overflow: hidden;
+  z-index: 0;
+`;
+
+const GlassPanel = styled.div<{ $position?: "top" | "bottom" | "right" | "left" }>`
+  position: absolute;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  border-radius: 24px;
+  
+  ${({ $position }) => {
+    switch ($position) {
+      case "top":
+        return `
+          top: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: min(90%, 1200px);
+          max-height: 35vh;
+          overflow-y: auto;
+        `;
+      case "bottom":
+        return `
+          bottom: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: min(90%, 800px);
+        `;
+      case "right":
+        return `
+          top: 50%;
+          right: 24px;
+          transform: translateY(-50%);
+          width: 320px;
+          max-height: 70vh;
+        `;
+      default:
+        return "";
+    }
+  }}
+`;
+
+const WebcamContainer = styled.div`
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 0;
+`;
+
+const VideoFrame = styled.div<{ $isRunning: boolean }>`
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
+  
+  video, canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  canvas {
+    pointer-events: none;
+  }
+  
+  &.is-mirrored video {
+    transform: scaleX(-1);
+  }
+`;
+
+const EmptyState = styled.div`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(113, 112, 255, 0.1), transparent 50%),
+    #030405;
+  color: rgba(255, 255, 255, 0.3);
+`;
+
+const ControlBar = styled(GlassPanel)`
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  z-index: 100;
+`;
+
+const SignalOverlay = styled(GlassPanel)`
+  position: fixed;
+  top: 32px;
+  right: 32px;
+  padding: 20px 28px;
+  min-width: 280px;
+  z-index: 100;
+`;
+
+const TTSOverlay = styled(GlassPanel)`
+  position: fixed;
+  top: 32px;
+  left: 32px;
+  padding: 20px 28px;
+  min-width: 300px;
+  z-index: 100;
+  
+  &.is-speaking {
+    border-color: rgba(255, 93, 93, 0.4);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 0 60px rgba(255, 93, 93, 0.2);
+  }
+`;
+
+const StyledButton = styled.button<{ $variant?: "primary" | "secondary" | "danger" }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 520;
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+  }
+  
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+  
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  
+  ${({ $variant }) => {
+    if ($variant === "primary") {
+      return `
+        background: linear-gradient(135deg, #7170ff, #5a58e8);
+        border-color: rgba(113, 112, 255, 0.6);
+        color: #fff;
+        
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, #8a88ff, #6d6bf0);
+        }
+      `;
+    }
+    if ($variant === "danger") {
+      return `
+        background: rgba(255, 93, 93, 0.18);
+        border-color: rgba(255, 93, 93, 0.5);
+        color: #ff8f8f;
+        
+        &:hover:not(:disabled) {
+          background: rgba(255, 93, 93, 0.28);
+        }
+      `;
+    }
+    return "";
+  }}
+`;
+
+const SignalLampGlass = styled.div<{ $color: "red" | "yellow" | "green"; $active: boolean }>`
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.25);
+  font-family: "Berkeley Mono", monospace;
+  font-size: 12px;
+  transition: all 300ms ease-out;
+  
+  ${({ $active, $color }) => {
+    if (!$active) return "";
+    
+    const glowColor = {
+      red: "rgba(255, 69, 58, 0.8)",
+      yellow: "rgba(255, 214, 10, 0.7)",
+      green: "rgba(48, 209, 88, 0.7)",
+    }[$color];
+    
+    const bgColor = {
+      red: "rgba(255, 69, 58, 0.95)",
+      yellow: "rgba(255, 214, 10, 0.9)",
+      green: "rgba(48, 209, 88, 0.9)",
+    }[$color];
+    
+    return `
+      background: ${bgColor};
+      color: #000;
+      font-weight: 700;
+      box-shadow:
+        0 0 40px ${glowColor},
+        0 0 80px ${glowColor},
+        inset 0 0 20px rgba(255, 255, 255, 0.4);
+      transform: scale(1.08);
+    `;
+  }}
+`;
+
+const TelemetryGridGlass = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+`;
+
+const TelemetryItemGlass = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  text-align: center;
+  
+  svg {
+    color: rgba(255, 255, 255, 0.4);
+    width: 18px;
+    height: 18px;
+  }
+  
+  span {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  strong {
+    font-size: 20px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+  }
+`;
+
+const StatusPill = styled.div<{ $variant?: "live" | "red" | "yellow" | "green" | "neutral" }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  
+  ${({ $variant }) => {
+    if ($variant === "live") {
+      return `
+        color: #30d158;
+        border-color: rgba(48, 209, 88, 0.4);
+        background: rgba(48, 209, 88, 0.08);
+      `;
+    }
+    if ($variant === "red") {
+      return `
+        color: #ff453a;
+        border-color: rgba(255, 69, 58, 0.4);
+      `;
+    }
+    if ($variant === "yellow") {
+      return `
+        color: #ffd60a;
+        border-color: rgba(255, 214, 10, 0.4);
+      `;
+    }
+    if ($variant === "green") {
+      return `
+        color: #30d158;
+        border-color: rgba(48, 209, 88, 0.4);
+      `;
+    }
+    return "";
+  }}
+`;
+
+const WarningText = styled.div`
+  text-align: center;
+  padding: 24px;
+  
+  .stop-label {
+    display: inline-block;
+    padding: 8px 16px;
+    background: rgba(255, 93, 93, 0.15);
+    border: 1px solid rgba(255, 93, 93, 0.4);
+    border-radius: 6px;
+    color: #ff8f8f;
+    font-family: "Berkeley Mono", monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+  
+  h3 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  
+  p {
+    font-size: 14px;
+    color: rgba(255, 208, 208, 0.7);
+    line-height: 1.5;
+  }
+`;
 
 type Signal = "R" | "Y" | "G";
 

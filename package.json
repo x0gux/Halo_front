@@ -10,6 +10,8 @@
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow/tfjs": "^4.22.0",
     "lucide-react": "^1.23.0",
