@@ -1,22 +1,83 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import "@tensorflow/tfjs";
+import {
+  Activity,
+  Camera,
+  CarFront,
+  Eye,
+  Gauge,
+  Megaphone,
+  Radio,
+  ScanLine,
+  ShieldAlert,
+  Square,
+  Users,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 
 type Signal = "R" | "Y" | "G";
 
-// 신호등 상태 머신 파라미터 (ESP32 main.cpp 의 R/Y/G 와 동일 의미)
-//  기본: 일반 신호등처럼 10초마다 R ↔ G 를 번갈아 점등.
-//  예외: G → R 로 바뀌는 순간 사람이 인식되어 있으면 R 로 가지 않고
-//        Y(노랑)를 켜서 "사람이 사라질 때까지" 유지한다. 사람이 없어지면 R 로 전환.
-const CYCLE_MS = 10000; // 빨강/초록 점등 시간 (10초)
-// 노랑(Y) 유지 중, 사람이 이 시간만큼 "연속으로" 안 보여야 빨강으로 전환.
-// COCO-SSD 가 프레임마다 사람을 놓치는(깜빡이는) 것을 흡수해, 사람이
-// 다 건너서 더는 인식되지 않을 때까지 노랑이 유지되게 한다.
+const CYCLE_MS = 10000;
 const CLEAR_GRACE_MS = 2000;
 
-const SIGNAL_NAME: Record<Signal, string> = { R: "RED", Y: "YELLOW", G: "GREEN" };
+const PEDESTRIAN_STAT_YEAR = 2025;
+const PEDESTRIAN_ACCIDENTS = 35356;
+const PEDESTRIAN_FATALITIES = 926;
+const PEDESTRIAN_INJURIES = 35735;
+
+const SIGNAL_LABEL: Record<Signal, string> = {
+  R: "차량 정지",
+  Y: "보호 통과",
+  G: "차량 진행",
+};
+
+const SIGNAL_TONE: Record<Signal, string> = {
+  R: "red",
+  Y: "yellow",
+  G: "green",
+};
+
+function getAnnualizedEstimate() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const nextYear = new Date(now.getFullYear() + 1, 0, 1);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const elapsedDays = Math.max(1, Math.ceil((now.getTime() - start.getTime() + 1) / dayMs));
+  const daysInYear = Math.round((nextYear.getTime() - start.getTime()) / dayMs);
+  const estimatedFatalities = Math.round((PEDESTRIAN_FATALITIES / daysInYear) * elapsedDays);
+
+  return {
+    dailyAverage: PEDESTRIAN_FATALITIES / daysInYear,
+    estimatedFatalities: Math.max(1, estimatedFatalities),
+  };
+}
+
+type RiskStats = ReturnType<typeof getAnnualizedEstimate>;
+
+function subscribeToSpeechSupport() {
+  return () => undefined;
+}
+
+function getSpeechSupport() {
+  return typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+}
+
+function getServerSpeechSupport() {
+  return false;
+}
 
 export default function TrafficLightDetector() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -25,26 +86,40 @@ export default function TrafficLightDetector() {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
 
-  // 상태 머신 내부 상태 (렌더와 분리하기 위해 ref 사용)
   const signalRef = useRef<Signal>("R");
-  const phaseStartRef = useRef(0); // 현재 R/G 점등이 시작된 시각
-  const lastSeenRef = useRef(0); // 노랑 유지 중 마지막으로 사람이 보인 시각
+  const phaseStartRef = useRef(0);
+  const lastSeenRef = useRef(0);
   const lastFrameRef = useRef(0);
   const lastPostedRef = useRef<Signal | null>(null);
+  const mirroredRef = useRef(true);
 
-  const [status, setStatus] = useState("모델 로딩 중…");
+  const [status, setStatus] = useState("COCO-SSD 모델 로딩 중");
   const [running, setRunning] = useState(false);
   const [signal, setSignal] = useState<Signal>("R");
   const [personCount, setPersonCount] = useState(0);
   const [fps, setFps] = useState(0);
   const [threshold, setThreshold] = useState(0.55);
-  const [mirrored, setMirrored] = useState(true);
+  const speechSupported = useSyncExternalStore(
+    subscribeToSpeechSupport,
+    getSpeechSupport,
+    getServerSpeechSupport
+  );
+  const [speaking, setSpeaking] = useState(false);
+  const [speechStatus, setSpeechStatus] = useState("경고 방송 대기 중");
   const thresholdRef = useRef(threshold);
   thresholdRef.current = threshold;
-  const mirroredRef = useRef(mirrored);
-  mirroredRef.current = mirrored;
 
-  // ── /esp API 로 신호 전송 (값이 바뀔 때만) ─────────────────────────
+  const riskStats = useMemo(() => getAnnualizedEstimate(), []);
+  const warningMessage = useMemo(
+    () =>
+      `지금 건너지마세요. 최근 공식 기준 보행자 사망자는 연간 ${PEDESTRIAN_FATALITIES}명, 하루 평균 ${riskStats.dailyAverage.toFixed(
+        1
+      )}명입니다. 오늘 같은 속도라면 이미 약 ${riskStats.estimatedFatalities}명이 도로에서 목숨을 잃었을 수 있습니다. 신호가 바뀔 때까지 멈추세요.`,
+    [riskStats.dailyAverage, riskStats.estimatedFatalities]
+  );
+
+  const detected = personCount > 0;
+
   const postSignal = useCallback((sig: Signal) => {
     if (lastPostedRef.current === sig) return;
     lastPostedRef.current = sig;
@@ -52,7 +127,9 @@ export default function TrafficLightDetector() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ signal: sig }),
-    }).catch(() => { });
+    }).catch(() => {
+      setStatus("ESP32 신호 전송 실패. 네트워크 상태를 확인하세요.");
+    });
   }, []);
 
   const applySignal = useCallback(
@@ -64,16 +141,13 @@ export default function TrafficLightDetector() {
     [postSignal]
   );
 
-  // ── 상태 머신 갱신 ────────────────────────────────────────────────
   const updateStateMachine = useCallback(
     (personPresent: boolean, now: number) => {
       const cur = signalRef.current;
 
       if (cur === "G") {
-        // 초록 10초 경과 → 빨강으로 전환할 차례
         if (now - phaseStartRef.current >= CYCLE_MS) {
           if (personPresent) {
-            // 전환 순간 사람이 있으면 빨강 대신 노랑 유지
             applySignal("Y");
             lastSeenRef.current = now;
           } else {
@@ -82,58 +156,54 @@ export default function TrafficLightDetector() {
           }
         }
       } else if (cur === "R") {
-        // 빨강 10초 경과 → 초록으로 전환
         if (now - phaseStartRef.current >= CYCLE_MS) {
           applySignal("G");
           phaseStartRef.current = now;
         }
-      } else {
-        // Y(노랑): 사람이 다 건너서 인식이 안 될 때까지 계속 유지.
-        // 한 프레임 놓침(깜빡임)으로 꺼지지 않도록, CLEAR_GRACE_MS 동안
-        // 연속으로 사람이 안 보일 때만 빨강으로 전환한다.
-        if (personPresent) {
-          lastSeenRef.current = now;
-        } else if (now - lastSeenRef.current >= CLEAR_GRACE_MS) {
-          applySignal("R");
-          phaseStartRef.current = now;
-        }
+      } else if (personPresent) {
+        lastSeenRef.current = now;
+      } else if (now - lastSeenRef.current >= CLEAR_GRACE_MS) {
+        applySignal("R");
+        phaseStartRef.current = now;
       }
     },
     [applySignal]
   );
 
-  // ── 감지 박스 그리기 ──────────────────────────────────────────────
   const drawDetections = useCallback((persons: cocoSsd.DetectedObject[]) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
+
     canvas.width = video.videoWidth || canvas.clientWidth;
     canvas.height = video.videoHeight || canvas.clientHeight;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const rootStyle = getComputedStyle(document.documentElement);
+    const highlight = rootStyle.getPropertyValue("--signal-green").trim() || "#30d158";
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.lineWidth = 3;
-    ctx.strokeStyle = "#34c759";
-    ctx.font = "16px sans-serif";
-    const mir = mirroredRef.current;
+    ctx.strokeStyle = highlight;
+    ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
     persons.forEach((p) => {
       const [bx, by, w, h] = p.bbox;
-      // 비디오만 좌우반전되므로, 캔버스(정방향)에 박스를 그릴 때는
-      // x 좌표만 반전시켜 거울 영상과 위치를 맞춘다. 글자는 정방향 유지.
-      const x = mir ? canvas.width - (bx + w) : bx;
-      const y = by;
-      ctx.strokeStyle = "#34c759";
-      ctx.strokeRect(x, y, w, h);
+      const x = mirroredRef.current ? canvas.width - (bx + w) : bx;
       const label = `person ${(p.score * 100).toFixed(0)}%`;
       const tw = ctx.measureText(label).width;
-      ctx.fillStyle = "#34c759";
-      ctx.fillRect(x, y - 20, tw + 8, 20);
-      ctx.fillStyle = "#000";
-      ctx.fillText(label, x + 4, y - 5);
+
+      ctx.strokeStyle = highlight;
+      ctx.strokeRect(x, by, w, h);
+      ctx.fillStyle = highlight;
+      ctx.fillRect(x, Math.max(0, by - 22), tw + 10, 22);
+      ctx.fillStyle = "#08090a";
+      ctx.fillText(label, x + 5, Math.max(16, by - 6));
     });
   }, []);
 
-  // ── 추론 루프 ─────────────────────────────────────────────────────
   const detectLoop = useCallback(async () => {
     const video = videoRef.current;
     const model = modelRef.current;
@@ -141,46 +211,51 @@ export default function TrafficLightDetector() {
 
     const now = performance.now();
     let persons: cocoSsd.DetectedObject[] = [];
+
     try {
       const predictions = await model.detect(video);
       persons = predictions.filter((p) => p.class === "person" && p.score >= thresholdRef.current);
     } catch {
-      /* 비디오 미준비 프레임 무시 */
+      setStatus("카메라 프레임 대기 중");
     }
 
     drawDetections(persons);
     setPersonCount(persons.length);
     updateStateMachine(persons.length > 0, now);
 
-    if (lastFrameRef.current) setFps(Number((1000 / (now - lastFrameRef.current)).toFixed(1)));
+    if (lastFrameRef.current) {
+      setFps(Number((1000 / (now - lastFrameRef.current)).toFixed(1)));
+    }
     lastFrameRef.current = now;
 
     rafRef.current = requestAnimationFrame(detectLoop);
   }, [drawDetections, updateStateMachine]);
 
-  // ── 카메라 시작/정지 ──────────────────────────────────────────────
   const startCamera = useCallback(async () => {
     if (!modelRef.current) {
       setStatus("모델이 아직 준비되지 않았습니다.");
       return;
     }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
       });
       streamRef.current = stream;
-      const video = videoRef.current!;
+
+      const video = videoRef.current;
+      if (!video) return;
       video.srcObject = stream;
       await video.play();
 
       phaseStartRef.current = performance.now();
       applySignal("R");
       setRunning(true);
-      setStatus("실행 중 — 10초마다 빨강↔초록. 초록→빨강 순간 사람이 있으면 노랑 유지.");
+      setStatus("실행 중. 10초마다 차량 빨강과 초록이 전환되고, 횡단자가 있으면 노랑 보호 모드로 유지됩니다.");
       rafRef.current = requestAnimationFrame(detectLoop);
     } catch (e) {
-      setStatus("카메라 접근 실패: " + (e as Error).message);
+      setStatus(`카메라 접근 실패: ${(e as Error).message}`);
     }
   }, [applySignal, detectLoop]);
 
@@ -189,200 +264,325 @@ export default function TrafficLightDetector() {
     rafRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+
     if (videoRef.current) videoRef.current.srcObject = null;
     const canvas = canvasRef.current;
     if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+
     setRunning(false);
     setPersonCount(0);
+    setFps(0);
     applySignal("R");
-    setStatus("정지됨.");
+    setStatus("정지됨. 차량 신호는 안전 기본값 R로 전송됩니다.");
   }, [applySignal]);
 
-  // ── 모델 로딩 (마운트 시 1회) ─────────────────────────────────────
+  const speakWarning = useCallback(() => {
+    if (!speechSupported) {
+      setSpeechStatus("이 브라우저는 TTS를 지원하지 않습니다.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(warningMessage);
+    utterance.lang = "ko-KR";
+    utterance.rate = 0.92;
+    utterance.pitch = 0.82;
+    utterance.volume = 1;
+    utterance.onstart = () => {
+      setSpeaking(true);
+      setSpeechStatus("경고 방송 송출 중");
+    };
+    utterance.onend = () => {
+      setSpeaking(false);
+      setSpeechStatus("경고 방송 완료");
+    };
+    utterance.onerror = () => {
+      setSpeaking(false);
+      setSpeechStatus("경고 방송 실패. 브라우저 음성 권한을 확인하세요.");
+    };
+    window.speechSynthesis.speak(utterance);
+  }, [speechSupported, warningMessage]);
+
+  const stopWarning = useCallback(() => {
+    if (!speechSupported) return;
+    window.speechSynthesis.cancel();
+    setSpeaking(false);
+    setSpeechStatus("경고 방송 중지됨");
+  }, [speechSupported]);
+
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
-        setStatus("COCO-SSD 모델 로딩 중…");
-        const model = await cocoSsd.load(); // 기본 lite_mobilenet_v2
+        setStatus("COCO-SSD 모델 로딩 중");
+        const model = await cocoSsd.load();
         if (cancelled) return;
         modelRef.current = model;
-        setStatus('모델 준비 완료 — "카메라 시작"을 누르세요.');
+        setStatus("모델 준비 완료. 카메라 시작을 누르세요.");
       } catch (e) {
-        setStatus("모델 로딩 실패 (인터넷 연결 필요): " + (e as Error).message);
+        setStatus(`모델 로딩 실패: ${(e as Error).message}`);
       }
     })();
+
     return () => {
       cancelled = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };
   }, []);
 
-  const detected = personCount > 0;
-
   return (
-    <div className="layout">
-      {/* 카메라 */}
-      <div className="card">
-        <div className={`video-wrap ${mirrored ? "mirrored" : ""}`}>
-          <video ref={videoRef} autoPlay muted playsInline />
-          <canvas ref={canvasRef} />
+    <section className="signal-workspace" aria-label="자동차 신호와 보행자 보호 제어">
+      <CameraPanel
+        canvasRef={canvasRef}
+        detected={detected}
+        fps={fps}
+        onThresholdChange={setThreshold}
+        personCount={personCount}
+        running={running}
+        startCamera={startCamera}
+        status={status}
+        stopCamera={stopCamera}
+        threshold={threshold}
+        videoRef={videoRef}
+      />
+      <VehicleSignalPanel signal={signal} />
+      <WarningPanel
+        riskStats={riskStats}
+        speakWarning={speakWarning}
+        speaking={speaking}
+        speechStatus={speechStatus}
+        speechSupported={speechSupported}
+        stopWarning={stopWarning}
+        warningMessage={warningMessage}
+      />
+    </section>
+  );
+}
+
+type CameraPanelProps = {
+  canvasRef: RefObject<HTMLCanvasElement | null>;
+  detected: boolean;
+  fps: number;
+  onThresholdChange: (threshold: number) => void;
+  personCount: number;
+  running: boolean;
+  startCamera: () => void;
+  status: string;
+  stopCamera: () => void;
+  threshold: number;
+  videoRef: RefObject<HTMLVideoElement | null>;
+};
+
+function CameraPanel({
+  canvasRef,
+  detected,
+  fps,
+  onThresholdChange,
+  personCount,
+  running,
+  startCamera,
+  status,
+  stopCamera,
+  threshold,
+  videoRef,
+}: CameraPanelProps) {
+  return (
+    <div className="panel camera-panel">
+      <div className="panel-header">
+        <div>
+          <p className="panel-kicker">Camera detection</p>
+          <h2>보행자 인식 화면</h2>
         </div>
-        <div className="controls">
-          <button className="primary" onClick={startCamera} disabled={running}>
-            ▶ 카메라 시작
-          </button>
-          <button onClick={stopCamera} disabled={!running}>
-            ■ 정지
-          </button>
-        </div>
-        <div className="status">{status}</div>
+        <span className={`live-pill ${running ? "is-live" : ""}`}>
+          <Radio size={14} aria-hidden="true" />
+          {running ? "LIVE" : "STANDBY"}
+        </span>
       </div>
 
-      {/* 신호등 + 상태 */}
-      <div className="card">
-        <div className="traffic-light">
-          <div className={`lamp red ${signal === "R" ? "on" : ""}`} />
-          <div className={`lamp yellow ${signal === "Y" ? "on" : ""}`} />
-          <div className={`lamp green ${signal === "G" ? "on" : ""}`} />
-        </div>
-
-        <div className="signal-box">
-          <div className="label">ESP32로 전송될 신호 (GET /esp)</div>
-          <div className="json">{JSON.stringify({ signal })}</div>
-        </div>
-
-        <div className="stat">
-          <span>현재 상태</span>
-          <span className="v">{SIGNAL_NAME[signal]}</span>
-        </div>
-        <div className="stat">
-          <span>감지된 사람 수</span>
-          <span className="v">{personCount}</span>
-        </div>
-        <div className="stat">
-          <span>사람 감지</span>
-          <span className="v">
-            <span className={`badge ${detected ? "on" : "off"}`}>{detected ? "감지됨" : "없음"}</span>
-          </span>
-        </div>
-        <div className="stat">
-          <span>추론 FPS</span>
-          <span className="v">{fps}</span>
-        </div>
-
-        <div className="field">
-          <label>
-            감지 신뢰도 임계값: {threshold.toFixed(2)}
-          </label>
-          <input
-            type="range"
-            min={0.2}
-            max={0.9}
-            step={0.05}
-            value={threshold}
-            onChange={(e) => setThreshold(parseFloat(e.target.value))}
-          />
-        </div>
+      <div className="video-frame is-mirrored">
+        <video ref={videoRef} autoPlay muted playsInline aria-label="카메라 영상" />
+        <canvas ref={canvasRef} aria-hidden="true" />
+        {!running && (
+          <div className="camera-placeholder">
+            <ScanLine size={36} aria-hidden="true" />
+            <span>카메라 시작 전</span>
+          </div>
+        )}
       </div>
 
-      <style>{styles}</style>
+      <div className="control-row">
+        <button type="button" className="icon-button primary" onClick={startCamera} disabled={running}>
+          <Camera size={16} aria-hidden="true" />
+          카메라 시작
+        </button>
+        <button type="button" className="icon-button secondary" onClick={stopCamera} disabled={!running}>
+          <Square size={16} aria-hidden="true" />
+          정지
+        </button>
+      </div>
+
+      <p className="system-status" aria-live="polite">
+        {status}
+      </p>
+
+      <div className="telemetry-grid" aria-label="감지 상태">
+        <TelemetryItem icon={<Users size={16} aria-hidden="true" />} label="감지 인원" value={personCount} />
+        <TelemetryItem icon={<Eye size={16} aria-hidden="true" />} label="사람 감지" value={detected ? "감지됨" : "없음"} />
+        <TelemetryItem icon={<Gauge size={16} aria-hidden="true" />} label="추론 FPS" value={fps} />
+      </div>
+
+      <label className="range-control">
+        <span>감지 신뢰도 임계값</span>
+        <strong>{threshold.toFixed(2)}</strong>
+        <input
+          type="range"
+          min={0.2}
+          max={0.9}
+          step={0.05}
+          value={threshold}
+          onChange={(e) => onThresholdChange(parseFloat(e.target.value))}
+        />
+      </label>
     </div>
   );
 }
 
-const styles = `
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-  gap: 20px;
+function TelemetryItem({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
+  return (
+    <div className="telemetry-item">
+      {icon}
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
 }
-@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
 
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
-}
-.video-wrap {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: #000;
-  border-radius: 10px;
-  overflow: hidden;
-}
-.video-wrap video, .video-wrap canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.video-wrap canvas { pointer-events: none; }
-.video-wrap.mirrored video { transform: scaleX(-1); }
+function VehicleSignalPanel({ signal }: { signal: Signal }) {
+  return (
+    <div className="panel signal-panel">
+      <div className="panel-header">
+        <div>
+          <p className="panel-kicker">Vehicle signal</p>
+          <h2>자동차용 신호등</h2>
+        </div>
+        <span className={`signal-chip ${SIGNAL_TONE[signal]}`}>{SIGNAL_LABEL[signal]}</span>
+      </div>
 
-.controls { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-button {
-  background: #21262d;
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 14px;
-  font-size: 13px;
-  cursor: pointer;
-}
-button:hover:not(:disabled) { background: #2d333b; }
-button:disabled { opacity: .45; cursor: not-allowed; }
-button.primary { background: #238636; border-color: #238636; }
-button.primary:hover:not(:disabled) { background: #2ea043; }
+      <div className="car-signal-wrap">
+        <div className="car-signal-header">
+          <CarFront size={24} aria-hidden="true" />
+          <span>CAR LANE</span>
+        </div>
+        <div className="traffic-light vehicle" aria-label={`현재 자동차용 신호등: ${SIGNAL_LABEL[signal]}`}>
+          <SignalLamp color="red" label="R" active={signal === "R"} />
+          <SignalLamp color="yellow" label="Y" active={signal === "Y"} />
+          <SignalLamp color="green" label="G" active={signal === "G"} />
+        </div>
+        <div className="vulnerable-notice">
+          <ShieldAlert size={18} aria-hidden="true" />
+          <span>사회적약자가 지나가고있어요</span>
+        </div>
+      </div>
 
-.traffic-light {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  background: #1c1c1e;
-  border: 3px solid #000;
-  border-radius: 18px;
-  padding: 18px;
-  width: fit-content;
-  margin: 0 auto 16px;
-}
-.lamp {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  background: #2a2a2a;
-  transition: all .25s;
-  border: 2px solid #000;
-}
-.lamp.red.on    { background: var(--red);    box-shadow: 0 0 28px 6px var(--red); }
-.lamp.yellow.on { background: var(--yellow); box-shadow: 0 0 28px 6px var(--yellow); }
-.lamp.green.on  { background: var(--green);  box-shadow: 0 0 28px 6px var(--green); }
+      <div className="signal-box">
+        <span>ESP32로 전송될 신호</span>
+        <code>{JSON.stringify({ signal })}</code>
+      </div>
 
-.signal-box {
-  text-align: center;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: #0d1117;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
+      <div className="stat-list">
+        <StatRow label="상태 머신" value={SIGNAL_LABEL[signal]} />
+        <StatRow label="API 계약" value="R | Y | G 유지" />
+        <StatRow label="보호 조건" value="횡단자 감지 시 Y 유지" />
+      </div>
+    </div>
+  );
 }
-.signal-box .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-.signal-box .json { font-size: 15px; margin-top: 6px; word-break: break-all; }
 
-.stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
-.stat:last-child { border-bottom: none; }
-.stat .v { font-weight: 600; }
-.status { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 18px; }
-.field { margin-top: 14px; }
-.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-.field input[type=range] { width: 100%; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-.badge.on { background: rgba(52,199,89,.18); color: var(--green); }
-.badge.off { background: rgba(255,59,48,.18); color: var(--red); }
-`;
+function SignalLamp({ active, color, label }: { active: boolean; color: string; label: string }) {
+  return (
+    <div className={`lamp ${color} ${active ? "on" : ""}`}>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function StatRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+type WarningPanelProps = {
+  riskStats: RiskStats;
+  speakWarning: () => void;
+  speaking: boolean;
+  speechStatus: string;
+  speechSupported: boolean;
+  stopWarning: () => void;
+  warningMessage: string;
+};
+
+function WarningPanel({
+  riskStats,
+  speakWarning,
+  speaking,
+  speechStatus,
+  speechSupported,
+  stopWarning,
+  warningMessage,
+}: WarningPanelProps) {
+  return (
+    <div className={`panel warning-panel ${speaking ? "is-speaking" : ""}`}>
+      <div className="panel-header">
+        <div>
+          <p className="panel-kicker">Pedestrian TTS</p>
+          <h2>건너지마세요 경고 방송</h2>
+        </div>
+        <Megaphone size={22} aria-hidden="true" />
+      </div>
+
+      <div className="warning-copy">
+        <strong>지금 건너지마세요.</strong>
+        <p>{warningMessage}</p>
+      </div>
+
+      <div className="fatality-grid">
+        <FatalityMetric label={`${PEDESTRIAN_STAT_YEAR} 공식 보행자 사고`} value={`${PEDESTRIAN_ACCIDENTS.toLocaleString()}건`} />
+        <FatalityMetric label="연간 사망자" value={`${PEDESTRIAN_FATALITIES.toLocaleString()}명`} />
+        <FatalityMetric label="연간 부상자" value={`${PEDESTRIAN_INJURIES.toLocaleString()}명`} />
+        <FatalityMetric label="오늘 누적 사망 추정" value={`약 ${riskStats.estimatedFatalities.toLocaleString()}명`} />
+      </div>
+
+      <div className="control-row">
+        <button type="button" className="icon-button danger" onClick={speakWarning} disabled={!speechSupported}>
+          <Volume2 size={16} aria-hidden="true" />
+          경고 방송 재생
+        </button>
+        <button type="button" className="icon-button secondary" onClick={stopWarning} disabled={!speechSupported || !speaking}>
+          <VolumeX size={16} aria-hidden="true" />
+          방송 중지
+        </button>
+      </div>
+
+      <p className="system-status" aria-live="polite">
+        <Activity size={14} aria-hidden="true" />
+        {speechSupported ? speechStatus : "이 브라우저는 TTS를 지원하지 않습니다."}
+      </p>
+    </div>
+  );
+}
+
+function FatalityMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}

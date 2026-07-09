@@ -2,16 +2,32 @@ import TrafficLightDetector from "./components/TrafficLightDetector";
 
 export default function Home() {
   return (
-    <main style={{ maxWidth: 1100, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
-        🚦 신호등 시스템 — COCO-SSD 사람 인식
-      </h1>
-      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 20 }}>
-        ESP32 신호등(<code>main.cpp</code>)의 R/Y/G 신호 로직을 Next.js로 재현합니다. 기본은 10초마다
-        빨강↔초록이 번갈아 켜지고, 초록→빨강으로 바뀌는 순간 카메라에 사람이 잡히면 빨강 대신
-        노랑을 켜서 사람이 사라질 때까지 유지합니다. 같은 신호가 <code>/esp</code> API로 전송되어
-        ESP32가 폴링할 수 있습니다.
-      </p>
+    <main className="app-shell">
+      <section className="hero" aria-labelledby="page-title">
+        <div className="hero-copy">
+          <div className="eyebrow">Halo Signal Ops</div>
+          <h1 id="page-title">자동차용 신호등과 보행자 보호 방송을 한 화면에.</h1>
+          <p>
+            COCO-SSD 사람 인식으로 횡단 중인 사용자를 확인하고, 기존 <code>/esp</code> 신호 API에는
+            그대로 <code>R</code>, <code>Y</code>, <code>G</code>만 전송합니다. 운전자는 자동차용 신호를 보고,
+            보행자는 경고 TTS를 즉시 들을 수 있습니다.
+          </p>
+        </div>
+        <aside className="hero-metrics" aria-label="보행자 사고 기준 통계">
+          <div className="metric-tile">
+            <span>최근 공식 보행자 사망</span>
+            <strong>926명</strong>
+          </div>
+          <div className="metric-tile">
+            <span>하루 평균 환산</span>
+            <strong>2.5명</strong>
+          </div>
+          <div className="metric-tile">
+            <span>ESP32 polling</span>
+            <code>GET /esp</code>
+          </div>
+        </aside>
+      </section>
       <TrafficLightDetector />
     </main>
   );
