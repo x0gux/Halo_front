@@ -542,7 +542,7 @@ const PEDESTRIAN_LABEL: Record<Signal, string> = {
 
 function getCarSignal(pedestrianSignal: Signal): Signal {
   if (pedestrianSignal === "G") return "R";
-  if (pedestrianSignal === "Y") return "Y";
+  if (pedestrianSignal === "Y") return "R";
   return "G";
 }
 
@@ -637,7 +637,7 @@ export default function TrafficLightDetector() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ signal: sig }),
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   const applySignal = useCallback(
