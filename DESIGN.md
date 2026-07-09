@@ -86,13 +86,13 @@ All spacing derives from a base of 4px.
 
 ### Signal Matrix
 
-| Car signal | Pedestrian signal | Behavior |
-|------------|-------------------|----------|
-| `R` | `G` | 보행 가능, 차량 정지 |
-| `Y` | `Y` | 보행 주의, 자동 TTS 즉시 재생 |
-| `G` | `R` | 차량 진행, 보행자 정지 |
+The `signal` state and `/api/esp` payload stay identical to `main`: it is the pedestrian signal. The car signal is derived for display only.
 
-Camera idle demo mode cycles `R -> G -> Y -> R` automatically so a laptop presentation shows the live signal transition before the camera starts. Camera live mode keeps using the detection state machine.
+| Main pedestrian signal | Derived car signal | Behavior |
+|------------------------|--------------------|----------|
+| `R` | `G` | 보행자 정지, 차량 진행 |
+| `Y` | `Y` | 보행 주의, 자동 TTS 즉시 재생 |
+| `G` | `R` | 보행 가능, 차량 정지 |
 
 ## 5. Components
 
@@ -113,22 +113,29 @@ Camera idle demo mode cycles `R -> G -> Y -> R` automatically so a laptop presen
 - **Motion**: 160ms color and transform.
 
 ### Car Traffic Light
-- **Structure**: horizontal housing with three clean circular lamps and protection notice underneath.
+- **Structure**: horizontal housing with three clean circular lamps and a matrix LED driver notice directly underneath.
 - **Variants**: red, yellow, green active.
 - **Spacing**: `--space-4` lamp gap.
 - **States**: inactive dimmed, active glow, reduced-motion static.
 - **Accessibility**: current signal duplicated as text.
 - **Motion**: lamp glow and scale only.
 
+### Vehicle LED Notice
+- **Structure**: compact dot-matrix board attached below the car light housing.
+- **Copy**: `사회적 약자가 지나가고있어요`.
+- **Color**: amber/yellow-green light on a near-black LED cabinet.
+- **Accessibility**: exposed as a polite status message for drivers.
+- **Motion**: static glow only; no scrolling text in demo mode.
+
 ### Pedestrian Traffic Light
 - **Structure**: compact vertical three-lamp housing below the car light.
 - **Variants**: red stop, yellow caution, green walk.
-- **Logic**: derived from the car signal only, never independently mutated.
+- **Logic**: source of truth from `main` signal state and `/api/esp` payload.
 - **Accessibility**: current pedestrian signal duplicated as text.
 - **Motion**: lamp glow and scale only.
 
 ### TTS Warning Console
-- **Structure**: red warning board, one compact fatality line, and speak/stop controls.
+- **Structure**: red warning board, one compact danger line, and speak/stop controls.
 - **Variants**: ready, speaking, unsupported, auto-triggered on pedestrian yellow.
 - **Spacing**: `--space-4` internal grid.
 - **States**: speaking live region, disabled unsupported controls.

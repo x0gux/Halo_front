@@ -5,7 +5,6 @@ import {
   type RefObject,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -27,19 +26,13 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import {
-  DEMO_PHASE_MS,
-  getNextDemoSignal,
-  getNextTrafficPhase,
-  getPedestrianSignal,
-  shouldAutoSpeakOnPedestrianSignalChange,
-  type PedestrianSignal,
-  type Signal,
-} from "./signalLogic";
 
-const PEDESTRIAN_FATALITIES = 926;
+type Signal = "R" | "Y" | "G";
 
-const SIGNAL_LABEL: Record<Signal, string> = {
+const CYCLE_MS = 10000;
+const CLEAR_GRACE_MS = 2000;
+
+const CAR_LABEL: Record<Signal, string> = {
   R: "차량 정지",
   Y: "보호 통과",
   G: "차량 진행",
@@ -51,33 +44,21 @@ const SIGNAL_TONE: Record<Signal, string> = {
   G: "green",
 };
 
-const PEDESTRIAN_LABEL: Record<PedestrianSignal, string> = {
+const PEDESTRIAN_LABEL: Record<Signal, string> = {
   R: "보행자 정지",
   Y: "보행 주의",
   G: "보행 가능",
 };
 
-const PEDESTRIAN_TONE: Record<PedestrianSignal, string> = {
-  R: "red",
-  Y: "yellow",
-  G: "green",
-};
-
-function getAnnualizedEstimate() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 1);
-  const nextYear = new Date(now.getFullYear() + 1, 0, 1);
-  const dayMs = 24 * 60 * 60 * 1000;
-  const elapsedDays = Math.max(1, Math.ceil((now.getTime() - start.getTime() + 1) / dayMs));
-  const daysInYear = Math.round((nextYear.getTime() - start.getTime()) / dayMs);
-  const estimatedFatalities = Math.round((PEDESTRIAN_FATALITIES / daysInYear) * elapsedDays);
-
-  return {
-    estimatedFatalities: Math.max(1, estimatedFatalities),
-  };
+function getCarSignal(pedestrianSignal: Signal): Signal {
+  if (pedestrianSignal === "G") return "R";
+  if (pedestrianSignal === "Y") return "Y";
+  return "G";
 }
 
-type RiskStats = ReturnType<typeof getAnnualizedEstimate>;
+function shouldAutoSpeakOnPedestrianSignalChange(previous: Signal, next: Signal) {
+  return previous !== "Y" && next === "Y";
+}
 
 function subscribeToSpeechSupport() {
   return () => undefined;
@@ -103,7 +84,7 @@ export default function TrafficLightDetector() {
   const lastSeenRef = useRef(0);
   const lastFrameRef = useRef(0);
   const lastPostedRef = useRef<Signal | null>(null);
-  const lastPedestrianSignalRef = useRef<PedestrianSignal>("G");
+  const lastPedestrianSignalRef = useRef<Signal>("R");
   const mirroredRef = useRef(true);
 
   const [status, setStatus] = useState("COCO-SSD 모델 로딩 중");
@@ -122,15 +103,11 @@ export default function TrafficLightDetector() {
   const thresholdRef = useRef(threshold);
   thresholdRef.current = threshold;
 
-  const riskStats = useMemo(() => getAnnualizedEstimate(), []);
-  const warningMessage = useMemo(
-    () =>
-      `건너지마세요. 연간 보행자 사망 ${PEDESTRIAN_FATALITIES}명. 올해도 약 ${riskStats.estimatedFatalities}명이 목숨을 잃었습니다.`,
-    [riskStats.estimatedFatalities]
-  );
+  const warningMessage = "건너지마세요. 지금 건너면 사고 위험이 큽니다. 뒤로 물러나세요.";
 
   const detected = personCount > 0;
-  const pedestrianSignal = getPedestrianSignal(signal);
+  const pedestrianSignal = signal;
+  const carSignal = getCarSignal(pedestrianSignal);
 
   const speakWarning = useCallback(() => {
     if (!speechSupported) {
@@ -166,44 +143,50 @@ export default function TrafficLightDetector() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ signal: sig }),
-    }).catch(() => {
-      setStatus("ESP32 신호 전송 실패. 네트워크 상태를 확인하세요.");
-    });
+    }).catch(() => {});
   }, []);
 
   const applySignal = useCallback(
     (sig: Signal) => {
       const previousPedestrianSignal = lastPedestrianSignalRef.current;
-      const nextPedestrianSignal = getPedestrianSignal(sig);
 
       signalRef.current = sig;
       setSignal(sig);
       postSignal(sig);
 
-      if (shouldAutoSpeakOnPedestrianSignalChange(previousPedestrianSignal, nextPedestrianSignal)) {
+      if (shouldAutoSpeakOnPedestrianSignalChange(previousPedestrianSignal, sig)) {
         speakWarning();
       }
 
-      lastPedestrianSignalRef.current = nextPedestrianSignal;
+      lastPedestrianSignalRef.current = sig;
     },
     [postSignal, speakWarning]
   );
 
   const updateStateMachine = useCallback(
     (personPresent: boolean, now: number) => {
-      const next = getNextTrafficPhase({
-        signal: signalRef.current,
-        phaseStart: phaseStartRef.current,
-        lastSeen: lastSeenRef.current,
-        personPresent,
-        now,
-      });
+      const cur = signalRef.current;
 
-      phaseStartRef.current = next.phaseStart;
-      lastSeenRef.current = next.lastSeen;
-
-      if (next.signal !== signalRef.current) {
-        applySignal(next.signal);
+      if (cur === "G") {
+        if (now - phaseStartRef.current >= CYCLE_MS) {
+          if (personPresent) {
+            applySignal("Y");
+            lastSeenRef.current = now;
+          } else {
+            applySignal("R");
+            phaseStartRef.current = now;
+          }
+        }
+      } else if (cur === "R") {
+        if (now - phaseStartRef.current >= CYCLE_MS) {
+          applySignal("G");
+          phaseStartRef.current = now;
+        }
+      } else if (personPresent) {
+        lastSeenRef.current = now;
+      } else if (now - lastSeenRef.current >= CLEAR_GRACE_MS) {
+        applySignal("R");
+        phaseStartRef.current = now;
       }
     },
     [applySignal]
@@ -291,7 +274,7 @@ export default function TrafficLightDetector() {
       phaseStartRef.current = performance.now();
       applySignal("R");
       setRunning(true);
-      setStatus("실행 중. 10초마다 차량 빨강과 초록이 전환되고, 횡단자가 있으면 노랑 보호 모드로 유지됩니다.");
+      setStatus("실행 중. 보행 신호 기준으로 차량 신호가 연동됩니다.");
       rafRef.current = requestAnimationFrame(detectLoop);
     } catch (e) {
       setStatus(`카메라 접근 실패: ${(e as Error).message}`);
@@ -312,7 +295,7 @@ export default function TrafficLightDetector() {
     setPersonCount(0);
     setFps(0);
     applySignal("R");
-    setStatus("정지됨. 차량 신호는 안전 기본값 R로 전송됩니다.");
+    setStatus("정지됨.");
   }, [applySignal]);
 
   const stopWarning = useCallback(() => {
@@ -323,16 +306,6 @@ export default function TrafficLightDetector() {
   }, [speechSupported]);
 
   useEffect(() => {
-    if (running) return;
-
-    const timer = window.setInterval(() => {
-      applySignal(getNextDemoSignal(signalRef.current));
-    }, DEMO_PHASE_MS);
-
-    return () => window.clearInterval(timer);
-  }, [applySignal, running]);
-
-  useEffect(() => {
     let cancelled = false;
 
     (async () => {
@@ -341,7 +314,7 @@ export default function TrafficLightDetector() {
         const model = await cocoSsd.load();
         if (cancelled) return;
         modelRef.current = model;
-        setStatus("모델 준비 완료. 카메라 시작 전에도 신호 데모가 순환됩니다.");
+        setStatus("모델 준비 완료");
       } catch (e) {
         setStatus(`모델 로딩 실패: ${(e as Error).message}`);
       }
@@ -370,9 +343,8 @@ export default function TrafficLightDetector() {
         threshold={threshold}
         videoRef={videoRef}
       />
-      <VehicleSignalPanel pedestrianSignal={pedestrianSignal} signal={signal} />
+      <VehicleSignalPanel carSignal={carSignal} pedestrianSignal={pedestrianSignal} />
       <WarningPanel
-        riskStats={riskStats}
         speakWarning={speakWarning}
         speaking={speaking}
         speechStatus={speechStatus}
@@ -482,47 +454,47 @@ function TelemetryItem({ icon, label, value }: { icon: ReactNode; label: string;
 }
 
 function VehicleSignalPanel({
+  carSignal,
   pedestrianSignal,
-  signal,
 }: {
-  pedestrianSignal: PedestrianSignal;
-  signal: Signal;
+  carSignal: Signal;
+  pedestrianSignal: Signal;
 }) {
   return (
-    <div className="panel signal-panel" data-car-signal={signal} data-pedestrian-signal={pedestrianSignal}>
+    <div className="panel signal-panel" data-car-signal={carSignal} data-pedestrian-signal={pedestrianSignal}>
       <div className="panel-header">
         <div>
           <p className="panel-kicker">Vehicle signal</p>
           <h2>자동차용 신호등</h2>
         </div>
-        <span className={`signal-chip ${SIGNAL_TONE[signal]}`}>{SIGNAL_LABEL[signal]}</span>
+        <span className={`signal-chip ${SIGNAL_TONE[carSignal]}`}>{CAR_LABEL[carSignal]}</span>
       </div>
 
       <div className="car-signal-wrap">
         <div className="car-signal-header">
           <CarFront size={24} aria-hidden="true" />
-          <span>CAR SIGNAL</span>
+          <span>차량 신호</span>
         </div>
-        <div className="traffic-light vehicle" aria-label={`현재 자동차용 신호등: ${SIGNAL_LABEL[signal]}`}>
-          <SignalLamp color="red" label="R" active={signal === "R"} />
-          <SignalLamp color="yellow" label="Y" active={signal === "Y"} />
-          <SignalLamp color="green" label="G" active={signal === "G"} />
+        <div className="traffic-light vehicle" aria-label={`현재 자동차용 신호등: ${CAR_LABEL[carSignal]}`}>
+          <SignalLamp color="red" label="R" active={carSignal === "R"} />
+          <SignalLamp color="yellow" label="Y" active={carSignal === "Y"} />
+          <SignalLamp color="green" label="G" active={carSignal === "G"} />
+        </div>
+        <div className="vehicle-led-board" role="status" aria-label="차량 운전자 안내: 사회적 약자가 지나가고있어요">
+          <ShieldAlert size={16} aria-hidden="true" />
+          <span>사회적 약자가 지나가고있어요</span>
         </div>
         <div className="pedestrian-signal" aria-label={`현재 보행자용 신호등: ${PEDESTRIAN_LABEL[pedestrianSignal]}`}>
           <div className="pedestrian-signal-header">
             <Users size={16} aria-hidden="true" />
             <span>보행자용 신호등</span>
-            <strong className={PEDESTRIAN_TONE[pedestrianSignal]}>{PEDESTRIAN_LABEL[pedestrianSignal]}</strong>
+            <strong className={SIGNAL_TONE[pedestrianSignal]}>{PEDESTRIAN_LABEL[pedestrianSignal]}</strong>
           </div>
           <div className="pedestrian-lightbar">
             <SignalLamp color="red" label="보행 정지" active={pedestrianSignal === "R"} />
             <SignalLamp color="yellow" label="보행 주의" active={pedestrianSignal === "Y"} />
             <SignalLamp color="green" label="보행 가능" active={pedestrianSignal === "G"} />
           </div>
-        </div>
-        <div className="vulnerable-notice">
-          <ShieldAlert size={18} aria-hidden="true" />
-          <span>사회적 약자가 지나가고있어요</span>
         </div>
       </div>
     </div>
@@ -538,7 +510,6 @@ function SignalLamp({ active, color, label }: { active: boolean; color: string; 
 }
 
 type WarningPanelProps = {
-  riskStats: RiskStats;
   speakWarning: () => void;
   speaking: boolean;
   speechStatus: string;
@@ -547,7 +518,6 @@ type WarningPanelProps = {
 };
 
 function WarningPanel({
-  riskStats,
   speakWarning,
   speaking,
   speechStatus,
@@ -567,7 +537,7 @@ function WarningPanel({
       <div className="warning-copy">
         <span className="warning-led">STOP</span>
         <strong>건너지마세요</strong>
-        <p>연간 사망 {PEDESTRIAN_FATALITIES.toLocaleString()}명 · 올해 추정 약 {riskStats.estimatedFatalities.toLocaleString()}명</p>
+        <p>지금 건너면 위험합니다. 뒤로 물러나세요.</p>
       </div>
 
       <div className="control-row">
