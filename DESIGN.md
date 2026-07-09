@@ -2,7 +2,7 @@
 
 ## 1. Atmosphere & Identity
 
-Halo Signal is a compact safety command center. The signature is a dark, automotive-grade control surface where a real car traffic light, camera detection, and pedestrian voice warning all stay visible at once. The interface should feel precise, urgent, and calm under pressure.
+Halo Signal is a compact traffic-signal device surface. The signature is a dark, automotive-grade control board where the car signal, pedestrian warning board, and camera feed read as live hardware, not as an explanatory landing page. The interface should feel precise, urgent, and calm under pressure.
 
 ## 2. Color
 
@@ -40,7 +40,7 @@ Halo Signal is a compact safety command center. The signature is a dark, automot
 
 | Level | Size | Weight | Line Height | Tracking | Usage |
 |-------|------|--------|-------------|----------|-------|
-| Display | `clamp(1.75rem, 3.4vw, 3.15rem)` | 590 | 1 | 0 | Demo headline |
+| Display | `clamp(1.45rem, 3vw, 2.35rem)` | 590 | 1 | 0 | Device title |
 | H1 | `2rem` | 590 | 1.1 | 0 | Section title |
 | H2 | `1.5rem` | 590 | 1.2 | 0 | Panel title |
 | H3 | `1.125rem` | 590 | 1.35 | 0 | Card title |
@@ -81,14 +81,14 @@ All spacing derives from a base of 4px.
 ### Grid
 
 - Max content width: 1360px.
-- Main workspace: three-column laptop demo grid so camera, car signal, and TTS warning are visible together at 1366x768.
-- Mobile: single-column stack with signal first after the hero stats.
+- Main workspace: three-column laptop demo grid so camera, horizontal car signal housing, and TTS warning board are visible together at 1366x768.
+- Mobile: single-column stack with signal first.
 
 ## 5. Components
 
 ### Command Panel
-- **Structure**: section with eyebrow, title, secondary copy, and optional stats.
-- **Variants**: hero, camera, signal, warning.
+- **Structure**: device surface with terse labels and live values only.
+- **Variants**: camera, signal, warning.
 - **Spacing**: `--space-5` to `--space-8`.
 - **States**: default, hover for interactive child controls, focus-within.
 - **Accessibility**: headings in source order, landmarks preserved.
@@ -103,7 +103,7 @@ All spacing derives from a base of 4px.
 - **Motion**: 160ms color and transform.
 
 ### Car Traffic Light
-- **Structure**: vertical housing with three circular lamps, labels, and protection notice underneath.
+- **Structure**: horizontal housing with three unlabeled circular lamps, hooded lens treatment, and protection notice underneath.
 - **Variants**: red, yellow, green active.
 - **Spacing**: `--space-4` lamp gap.
 - **States**: inactive dimmed, active glow, reduced-motion static.
@@ -111,7 +111,7 @@ All spacing derives from a base of 4px.
 - **Motion**: lamp glow and scale only.
 
 ### TTS Warning Console
-- **Structure**: risk headline, annual statistics, live estimate, and speak/stop controls.
+- **Structure**: red warning board, one compact fatality line, and speak/stop controls.
 - **Variants**: ready, speaking, unsupported.
 - **Spacing**: `--space-4` internal grid.
 - **States**: speaking live region, disabled unsupported controls.

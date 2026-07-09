@@ -33,10 +33,7 @@ type Signal = "R" | "Y" | "G";
 const CYCLE_MS = 10000;
 const CLEAR_GRACE_MS = 2000;
 
-const PEDESTRIAN_STAT_YEAR = 2025;
-const PEDESTRIAN_ACCIDENTS = 35356;
 const PEDESTRIAN_FATALITIES = 926;
-const PEDESTRIAN_INJURIES = 35735;
 
 const SIGNAL_LABEL: Record<Signal, string> = {
   R: "차량 정지",
@@ -60,7 +57,6 @@ function getAnnualizedEstimate() {
   const estimatedFatalities = Math.round((PEDESTRIAN_FATALITIES / daysInYear) * elapsedDays);
 
   return {
-    dailyAverage: PEDESTRIAN_FATALITIES / daysInYear,
     estimatedFatalities: Math.max(1, estimatedFatalities),
   };
 }
@@ -112,10 +108,8 @@ export default function TrafficLightDetector() {
   const riskStats = useMemo(() => getAnnualizedEstimate(), []);
   const warningMessage = useMemo(
     () =>
-      `지금 건너지마세요. 최근 공식 기준 보행자 사망자는 연간 ${PEDESTRIAN_FATALITIES}명, 하루 평균 ${riskStats.dailyAverage.toFixed(
-        1
-      )}명입니다. 오늘 같은 속도라면 이미 약 ${riskStats.estimatedFatalities}명이 도로에서 목숨을 잃었을 수 있습니다. 신호가 바뀔 때까지 멈추세요.`,
-    [riskStats.dailyAverage, riskStats.estimatedFatalities]
+      `건너지마세요. 연간 보행자 사망 ${PEDESTRIAN_FATALITIES}명. 올해도 약 ${riskStats.estimatedFatalities}명이 목숨을 잃었습니다.`,
+    [riskStats.estimatedFatalities]
   );
 
   const detected = personCount > 0;
@@ -285,7 +279,7 @@ export default function TrafficLightDetector() {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(warningMessage);
     utterance.lang = "ko-KR";
-    utterance.rate = 0.92;
+    utterance.rate = 1.08;
     utterance.pitch = 0.82;
     utterance.volume = 1;
     utterance.onstart = () => {
@@ -356,7 +350,6 @@ export default function TrafficLightDetector() {
         speechStatus={speechStatus}
         speechSupported={speechSupported}
         stopWarning={stopWarning}
-        warningMessage={warningMessage}
       />
     </section>
   );
@@ -474,7 +467,7 @@ function VehicleSignalPanel({ signal }: { signal: Signal }) {
       <div className="car-signal-wrap">
         <div className="car-signal-header">
           <CarFront size={24} aria-hidden="true" />
-          <span>CAR LANE</span>
+          <span>CAR SIGNAL</span>
         </div>
         <div className="traffic-light vehicle" aria-label={`현재 자동차용 신호등: ${SIGNAL_LABEL[signal]}`}>
           <SignalLamp color="red" label="R" active={signal === "R"} />
@@ -483,19 +476,8 @@ function VehicleSignalPanel({ signal }: { signal: Signal }) {
         </div>
         <div className="vulnerable-notice">
           <ShieldAlert size={18} aria-hidden="true" />
-          <span>사회적약자가 지나가고있어요</span>
+          <span>사회적 약자가 지나가고있어요</span>
         </div>
-      </div>
-
-      <div className="signal-box">
-        <span>ESP32로 전송될 신호</span>
-        <code>{JSON.stringify({ signal })}</code>
-      </div>
-
-      <div className="stat-list">
-        <StatRow label="상태 머신" value={SIGNAL_LABEL[signal]} />
-        <StatRow label="API 계약" value="R | Y | G 유지" />
-        <StatRow label="보호 조건" value="횡단자 감지 시 Y 유지" />
       </div>
     </div>
   );
@@ -504,16 +486,7 @@ function VehicleSignalPanel({ signal }: { signal: Signal }) {
 function SignalLamp({ active, color, label }: { active: boolean; color: string; label: string }) {
   return (
     <div className={`lamp ${color} ${active ? "on" : ""}`}>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function StatRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <span className="sr-only">{label}</span>
     </div>
   );
 }
@@ -525,7 +498,6 @@ type WarningPanelProps = {
   speechStatus: string;
   speechSupported: boolean;
   stopWarning: () => void;
-  warningMessage: string;
 };
 
 function WarningPanel({
@@ -535,7 +507,6 @@ function WarningPanel({
   speechStatus,
   speechSupported,
   stopWarning,
-  warningMessage,
 }: WarningPanelProps) {
   return (
     <div className={`panel warning-panel ${speaking ? "is-speaking" : ""}`}>
@@ -548,15 +519,9 @@ function WarningPanel({
       </div>
 
       <div className="warning-copy">
-        <strong>지금 건너지마세요.</strong>
-        <p>{warningMessage}</p>
-      </div>
-
-      <div className="fatality-grid">
-        <FatalityMetric label={`${PEDESTRIAN_STAT_YEAR} 공식 보행자 사고`} value={`${PEDESTRIAN_ACCIDENTS.toLocaleString()}건`} />
-        <FatalityMetric label="연간 사망자" value={`${PEDESTRIAN_FATALITIES.toLocaleString()}명`} />
-        <FatalityMetric label="연간 부상자" value={`${PEDESTRIAN_INJURIES.toLocaleString()}명`} />
-        <FatalityMetric label="오늘 누적 사망 추정" value={`약 ${riskStats.estimatedFatalities.toLocaleString()}명`} />
+        <span className="warning-led">STOP</span>
+        <strong>건너지마세요</strong>
+        <p>연간 사망 {PEDESTRIAN_FATALITIES.toLocaleString()}명 · 올해 추정 약 {riskStats.estimatedFatalities.toLocaleString()}명</p>
       </div>
 
       <div className="control-row">
@@ -574,15 +539,6 @@ function WarningPanel({
         <Activity size={14} aria-hidden="true" />
         {speechSupported ? speechStatus : "이 브라우저는 TTS를 지원하지 않습니다."}
       </p>
-    </div>
-  );
-}
-
-function FatalityMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }
