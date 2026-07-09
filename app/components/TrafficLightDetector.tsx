@@ -103,7 +103,7 @@ export default function TrafficLightDetector() {
   const thresholdRef = useRef(threshold);
   thresholdRef.current = threshold;
 
-  const warningMessage = "건너지마세요. 지금 건너면 사고 위험이 큽니다. 뒤로 물러나세요.";
+  const warningMessage = "꼬리물기하지 마세요. 사고 위험이 큽니다. 뒤로 물러나세요.";
 
   const detected = personCount > 0;
   const pedestrianSignal = signal;
