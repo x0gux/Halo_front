@@ -400,19 +400,6 @@ code {
   pointer-events: none;
 }
 
-.traffic-light.vehicle::after {
-  content: "";
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  width: 96px;
-  height: 16px;
-  transform: translateX(-50%);
-  border-radius: 10px 10px 4px 4px;
-  background: linear-gradient(180deg, #2b2f36, #08090a);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
 .lamp {
   position: relative;
   display: grid;
@@ -432,17 +419,6 @@ code {
     inset 0 0 26px rgba(0, 0, 0, 0.88),
     0 10px 22px rgba(0, 0, 0, 0.38);
   transition: transform 200ms ease-in-out, filter 200ms ease-in-out, box-shadow 200ms ease-in-out;
-}
-
-.lamp::before {
-  content: "";
-  position: absolute;
-  inset: -11px -14px 52%;
-  border-radius: 999px 999px 14px 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(0, 0, 0, 0.78));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom: 0;
-  pointer-events: none;
 }
 
 .lamp.on {
@@ -476,9 +452,11 @@ code {
   position: relative;
   z-index: 1;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: rgba(8, 9, 10, 0.45);
@@ -486,8 +464,9 @@ code {
 
 .pedestrian-signal-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-2);
   color: var(--text-secondary);
   font-size: 0.8125rem;
@@ -499,7 +478,8 @@ code {
 }
 
 .pedestrian-signal-header strong {
-  margin-left: auto;
+  flex-basis: 100%;
+  margin-left: 0;
   font-size: 0.75rem;
   font-weight: 590;
 }
@@ -518,26 +498,23 @@ code {
 
 .pedestrian-lightbar {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  width: min(230px, 100%);
+  width: 74px;
   justify-self: center;
   padding: var(--space-2);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 20%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 22%),
     linear-gradient(145deg, #1b1e24, #060708 72%);
   box-shadow: inset 0 -18px 32px rgba(0, 0, 0, 0.45);
 }
 
 .pedestrian-lightbar .lamp {
-  width: min(52px, 100%);
-}
-
-.pedestrian-lightbar .lamp::before {
-  inset: -7px -9px 52%;
+  width: 46px;
 }
 
 .vulnerable-notice {
@@ -724,6 +701,7 @@ code {
   }
 
   .pedestrian-signal {
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 6px;
     padding: 8px;
   }
@@ -737,12 +715,13 @@ code {
   }
 
   .pedestrian-lightbar {
-    width: min(210px, 100%);
+    width: 66px;
     padding: 6px;
+    border-radius: 22px;
   }
 
   .pedestrian-lightbar .lamp {
-    width: min(42px, 100%);
+    width: 38px;
   }
 
   .vulnerable-notice {

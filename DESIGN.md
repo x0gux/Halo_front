@@ -81,7 +81,7 @@ All spacing derives from a base of 4px.
 ### Grid
 
 - Max content width: 1360px.
-- Main workspace: three-column laptop demo grid so camera, horizontal car signal housing, pedestrian signal housing, and TTS warning board are visible together at 1366x768.
+- Main workspace: three-column laptop demo grid so camera, horizontal car signal housing, vertical pedestrian signal housing, and TTS warning board are visible together at 1366x768.
 - Mobile: single-column stack with signal first.
 
 ### Signal Matrix
@@ -111,7 +111,7 @@ All spacing derives from a base of 4px.
 - **Motion**: 160ms color and transform.
 
 ### Car Traffic Light
-- **Structure**: horizontal housing with three unlabeled circular lamps, hooded lens treatment, and protection notice underneath.
+- **Structure**: horizontal housing with three clean circular lamps and protection notice underneath.
 - **Variants**: red, yellow, green active.
 - **Spacing**: `--space-4` lamp gap.
 - **States**: inactive dimmed, active glow, reduced-motion static.
@@ -119,7 +119,7 @@ All spacing derives from a base of 4px.
 - **Motion**: lamp glow and scale only.
 
 ### Pedestrian Traffic Light
-- **Structure**: compact horizontal three-lamp housing below the car light.
+- **Structure**: compact vertical three-lamp housing below the car light.
 - **Variants**: red stop, yellow caution, green walk.
 - **Logic**: derived from the car signal only, never independently mutated.
 - **Accessibility**: current pedestrian signal duplicated as text.
