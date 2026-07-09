@@ -855,13 +855,8 @@ export default function TrafficLightDetector() {
 
         <LampRow>
           <SignalLampGlass $color="red" $active={carSignal === "R"}>
-            R
-          </SignalLampGlass>
-          <SignalLampGlass $color="yellow" $active={carSignal === "Y"}>
-            Y
           </SignalLampGlass>
           <SignalLampGlass $color="green" $active={carSignal === "G"}>
-            G
           </SignalLampGlass>
         </LampRow>
 
