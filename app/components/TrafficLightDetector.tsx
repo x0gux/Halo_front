@@ -28,6 +28,8 @@ import {
   VolumeX,
 } from "lucide-react";
 import {
+  DEMO_PHASE_MS,
+  getNextDemoSignal,
   getNextTrafficPhase,
   getPedestrianSignal,
   shouldAutoSpeakOnPedestrianSignalChange,
@@ -321,6 +323,16 @@ export default function TrafficLightDetector() {
   }, [speechSupported]);
 
   useEffect(() => {
+    if (running) return;
+
+    const timer = window.setInterval(() => {
+      applySignal(getNextDemoSignal(signalRef.current));
+    }, DEMO_PHASE_MS);
+
+    return () => window.clearInterval(timer);
+  }, [applySignal, running]);
+
+  useEffect(() => {
     let cancelled = false;
 
     (async () => {
@@ -329,7 +341,7 @@ export default function TrafficLightDetector() {
         const model = await cocoSsd.load();
         if (cancelled) return;
         modelRef.current = model;
-        setStatus("모델 준비 완료. 카메라 시작을 누르세요.");
+        setStatus("모델 준비 완료. 카메라 시작 전에도 신호 데모가 순환됩니다.");
       } catch (e) {
         setStatus(`모델 로딩 실패: ${(e as Error).message}`);
       }

@@ -3,6 +3,7 @@ export type PedestrianSignal = "R" | "Y" | "G";
 
 export const CYCLE_MS = 10000;
 export const CLEAR_GRACE_MS = 2000;
+export const DEMO_PHASE_MS = 3500;
 
 type TrafficPhaseInput = {
   signal: Signal;
@@ -29,6 +30,12 @@ export function shouldAutoSpeakOnPedestrianSignalChange(
   next: PedestrianSignal
 ) {
   return previous !== "Y" && next === "Y";
+}
+
+export function getNextDemoSignal(signal: Signal): Signal {
+  if (signal === "R") return "G";
+  if (signal === "G") return "Y";
+  return "R";
 }
 
 export function getNextTrafficPhase({

@@ -92,6 +92,8 @@ All spacing derives from a base of 4px.
 | `Y` | `Y` | 보행 주의, 자동 TTS 즉시 재생 |
 | `G` | `R` | 차량 진행, 보행자 정지 |
 
+Camera idle demo mode cycles `R -> G -> Y -> R` automatically so a laptop presentation shows the live signal transition before the camera starts. Camera live mode keeps using the detection state machine.
+
 ## 5. Components
 
 ### Command Panel
