@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  type ReactNode,
-  type RefObject,
   useCallback,
   useEffect,
   useRef,
@@ -28,7 +26,10 @@ import {
 } from "lucide-react";
 import styled from "@emotion/styled";
 
-// Styled components for glassmorphism UI
+// ─────────────────────────────────────────────────────
+// Glassmorphism styled components
+// ─────────────────────────────────────────────────────
+
 const FullscreenContainer = styled.div`
   position: fixed;
   inset: 0;
@@ -38,54 +39,8 @@ const FullscreenContainer = styled.div`
     radial-gradient(circle at 15% 10%, rgba(113, 112, 255, 0.15), transparent 30%),
     radial-gradient(circle at 85% 80%, rgba(48, 209, 88, 0.12), transparent 35%),
     linear-gradient(135deg, #0a0b0d 0%, #0f1115 50%, #08090a 100%);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   overflow: hidden;
   z-index: 0;
-`;
-
-const GlassPanel = styled.div<{ $position?: "top" | "bottom" | "right" | "left" }>`
-  position: absolute;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  border-radius: 24px;
-  
-  ${({ $position }) => {
-    switch ($position) {
-      case "top":
-        return `
-          top: 24px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: min(90%, 1200px);
-          max-height: 35vh;
-          overflow-y: auto;
-        `;
-      case "bottom":
-        return `
-          bottom: 24px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: min(90%, 800px);
-        `;
-      case "right":
-        return `
-          top: 50%;
-          right: 24px;
-          transform: translateY(-50%);
-          width: 320px;
-          max-height: 70vh;
-        `;
-      default:
-        return "";
-    }
-  }}
 `;
 
 const WebcamContainer = styled.div`
@@ -105,19 +60,20 @@ const VideoFrame = styled.div<{ $isRunning: boolean }>`
   height: 100vh;
   background: #000;
   overflow: hidden;
-  
-  video, canvas {
+
+  video,
+  canvas {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-  
+
   canvas {
     pointer-events: none;
   }
-  
+
   &.is-mirrored video {
     transform: scaleX(-1);
   }
@@ -135,84 +91,110 @@ const EmptyState = styled.div`
     radial-gradient(circle at 50% 50%, rgba(113, 112, 255, 0.1), transparent 50%),
     #030405;
   color: rgba(255, 255, 255, 0.3);
+  z-index: 2;
 `;
 
-const ControlBar = styled(GlassPanel)`
+// ── Glass overlay panels ──
+
+const GlassOverlay = styled.div<{
+  $top?: string;
+  $right?: string;
+  $bottom?: string;
+  $left?: string;
+  $transform?: string;
+}>`
   position: fixed;
-  bottom: 32px;
+  ${({ $top }) => ($top ? `top: ${$top};` : "")}
+  ${({ $right }) => ($right ? `right: ${$right};` : "")}
+  ${({ $bottom }) => ($bottom ? `bottom: ${$bottom};` : "")}
+  ${({ $left }) => ($left ? `left: ${$left};` : "")}
+  ${({ $transform }) => ($transform ? `transform: ${$transform};` : "")}
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  z-index: 100;
+`;
+
+const SignalOverlay = styled(GlassOverlay)`
+  top: 24px;
+  right: 24px;
+  padding: 20px 24px;
+  min-width: 260px;
+`;
+
+const TTSOverlay = styled(GlassOverlay)`
+  top: 24px;
+  left: 24px;
+  padding: 20px 24px;
+  min-width: 280px;
+  max-width: 360px;
+  transition: border-color 300ms, box-shadow 300ms;
+
+  &.is-speaking {
+    border-color: rgba(255, 93, 93, 0.5);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 60px rgba(255, 93, 93, 0.25);
+  }
+`;
+
+const ControlBar = styled(GlassOverlay)`
+  bottom: 28px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 24px;
-  z-index: 100;
+  gap: 14px;
+  padding: 14px 22px;
+  flex-wrap: wrap;
+  justify-content: center;
 `;
 
-const SignalOverlay = styled(GlassPanel)`
-  position: fixed;
-  top: 32px;
-  right: 32px;
-  padding: 20px 28px;
-  min-width: 280px;
-  z-index: 100;
-`;
-
-const TTSOverlay = styled(GlassPanel)`
-  position: fixed;
-  top: 32px;
-  left: 32px;
-  padding: 20px 28px;
-  min-width: 300px;
-  z-index: 100;
-  
-  &.is-speaking {
-    border-color: rgba(255, 93, 93, 0.4);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 0 60px rgba(255, 93, 93, 0.2);
-  }
-`;
+// ── Internal glass components ──
 
 const StyledButton = styled.button<{ $variant?: "primary" | "secondary" | "danger" }>`
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
-  padding: 0 20px;
-  border-radius: 12px;
-  font-size: 14px;
+  min-height: 36px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 520;
   cursor: pointer;
   transition: all 200ms ease-out;
-  
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.9);
-  
+  white-space: nowrap;
+
   &:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
+    transform: translateY(-1px);
   }
-  
+
   &:active:not(:disabled) {
     transform: translateY(0);
   }
-  
+
   &:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
-  
+
   ${({ $variant }) => {
     if ($variant === "primary") {
       return `
         background: linear-gradient(135deg, #7170ff, #5a58e8);
         border-color: rgba(113, 112, 255, 0.6);
         color: #fff;
-        
         &:hover:not(:disabled) {
           background: linear-gradient(135deg, #8a88ff, #6d6bf0);
         }
@@ -223,7 +205,6 @@ const StyledButton = styled.button<{ $variant?: "primary" | "secondary" | "dange
         background: rgba(255, 93, 93, 0.18);
         border-color: rgba(255, 93, 93, 0.5);
         color: #ff8f8f;
-        
         &:hover:not(:disabled) {
           background: rgba(255, 93, 93, 0.28);
         }
@@ -234,9 +215,8 @@ const StyledButton = styled.button<{ $variant?: "primary" | "secondary" | "dange
 `;
 
 const SignalLampGlass = styled.div<{ $color: "red" | "yellow" | "green"; $active: boolean }>`
-  position: relative;
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -248,24 +228,24 @@ const SignalLampGlass = styled.div<{ $color: "red" | "yellow" | "green"; $active
   justify-content: center;
   color: rgba(255, 255, 255, 0.25);
   font-family: "Berkeley Mono", monospace;
-  font-size: 12px;
+  font-size: 11px;
   transition: all 300ms ease-out;
-  
+
   ${({ $active, $color }) => {
     if (!$active) return "";
-    
+
     const glowColor = {
       red: "rgba(255, 69, 58, 0.8)",
       yellow: "rgba(255, 214, 10, 0.7)",
       green: "rgba(48, 209, 88, 0.7)",
     }[$color];
-    
+
     const bgColor = {
       red: "rgba(255, 69, 58, 0.95)",
       yellow: "rgba(255, 214, 10, 0.9)",
       green: "rgba(48, 209, 88, 0.9)",
     }[$color];
-    
+
     return `
       background: ${bgColor};
       color: #000;
@@ -279,57 +259,171 @@ const SignalLampGlass = styled.div<{ $color: "red" | "yellow" | "green"; $active
   }}
 `;
 
-const TelemetryGridGlass = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 16px;
-`;
-
-const TelemetryItemGlass = styled.div`
+const OverlaySectionLabel = styled.div`
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  text-align: center;
-  
+  gap: 8px;
+  margin-bottom: 12px;
+
   svg {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.5);
     width: 18px;
     height: 18px;
   }
-  
+
   span {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.45);
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
-  
-  strong {
-    font-size: 20px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.95);
+`;
+
+const LampRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 12px;
+`;
+
+const LedBoard = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(245, 184, 75, 0.5);
+  border-radius: 6px;
+  background: rgba(8, 7, 4, 0.5);
+  color: #ffd66b;
+  font-family: "Berkeley Mono", monospace;
+  font-size: 12px;
+  font-weight: 590;
+  text-shadow: 0 0 8px rgba(255, 214, 10, 0.6);
+  margin-bottom: 10px;
+
+  svg {
+    color: #ffd60a;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 6px rgba(255, 214, 10, 0.5));
   }
 `;
 
-const StatusPill = styled.div<{ $variant?: "live" | "red" | "yellow" | "green" | "neutral" }>`
+const PedestrianInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+
+  strong {
+    font-weight: 600;
+    &.red { color: #ff453a; }
+    &.yellow { color: #ffd60a; }
+    &.green { color: #30d158; }
+  }
+
+  svg {
+    color: rgba(255, 255, 255, 0.4);
+    width: 14px;
+    height: 14px;
+  }
+`;
+
+const TTSHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+
+  svg {
+    color: #ff5d5d;
+    width: 20px;
+    height: 20px;
+  }
+
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+  }
+`;
+
+const WarningContent = styled.div`
+  text-align: center;
+  padding: 12px;
+  border: 1px solid rgba(255, 93, 93, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 93, 93, 0.06);
+  margin-bottom: 12px;
+
+  .stop-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(255, 93, 93, 0.2);
+    border: 1px solid rgba(255, 93, 93, 0.5);
+    border-radius: 4px;
+    color: #ff8f8f;
+    font-family: "Berkeley Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+    line-height: 1.1;
+  }
+
+  p {
+    font-size: 12px;
+    color: rgba(255, 208, 208, 0.7);
+    line-height: 1.4;
+  }
+`;
+
+const ButtonRow = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+`;
+
+const StatusLine = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+
+  svg {
+    width: 12px;
+    height: 12px;
+    color: rgba(255, 255, 255, 0.3);
+  }
+`;
+
+const StatusPill = styled.span<{ $variant?: "live" | "red" | "yellow" | "green" | "neutral" }>`
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 4px 12px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.5px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.6);
-  
+
   ${({ $variant }) => {
     if ($variant === "live") {
       return `
@@ -360,37 +454,64 @@ const StatusPill = styled.div<{ $variant?: "live" | "red" | "yellow" | "green" |
   }}
 `;
 
-const WarningText = styled.div`
-  text-align: center;
-  padding: 24px;
-  
-  .stop-label {
-    display: inline-block;
-    padding: 8px 16px;
-    background: rgba(255, 93, 93, 0.15);
-    border: 1px solid rgba(255, 93, 93, 0.4);
-    border-radius: 6px;
-    color: #ff8f8f;
-    font-family: "Berkeley Mono", monospace;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    margin-bottom: 12px;
+const TelemetryGridGlass = styled.div`
+  display: flex;
+  gap: 10px;
+  align-items: center;
+`;
+
+const TelemetryItemGlass = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+
+  svg {
+    width: 12px;
+    height: 12px;
+    color: rgba(255, 255, 255, 0.35);
   }
-  
-  h3 {
-    font-size: 32px;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 8px;
-  }
-  
-  p {
-    font-size: 14px;
-    color: rgba(255, 208, 208, 0.7);
-    line-height: 1.5;
+
+  strong {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    font-weight: 600;
   }
 `;
+
+const ThresholdSlider = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+
+  input {
+    width: 60px;
+    accent-color: #7170ff;
+  }
+
+  strong {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    min-width: 32px;
+    text-align: right;
+  }
+`;
+
+const StatusText = styled.span`
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+`;
+
+// ─────────────────────────────────────────────────────
+// Types & constants
+// ─────────────────────────────────────────────────────
 
 type Signal = "R" | "Y" | "G";
 
@@ -415,6 +536,10 @@ const PEDESTRIAN_LABEL: Record<Signal, string> = {
   G: "보행 가능",
 };
 
+// ─────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────
+
 function getCarSignal(pedestrianSignal: Signal): Signal {
   if (pedestrianSignal === "G") return "R";
   if (pedestrianSignal === "Y") return "Y";
@@ -436,6 +561,10 @@ function getSpeechSupport() {
 function getServerSpeechSupport() {
   return false;
 }
+
+// ─────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────
 
 export default function TrafficLightDetector() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -693,233 +822,142 @@ export default function TrafficLightDetector() {
     };
   }, []);
 
+  // ── Render ──────────────────────────────────────────
+
   return (
-    <section className="signal-workspace" aria-label="자동차 신호와 보행자 보호 제어">
-      <CameraPanel
-        canvasRef={canvasRef}
-        detected={detected}
-        fps={fps}
-        onThresholdChange={setThreshold}
-        personCount={personCount}
-        running={running}
-        startCamera={startCamera}
-        status={status}
-        stopCamera={stopCamera}
-        threshold={threshold}
-        videoRef={videoRef}
-      />
-      <VehicleSignalPanel carSignal={carSignal} pedestrianSignal={pedestrianSignal} />
-      <WarningPanel
-        speakWarning={speakWarning}
-        speaking={speaking}
-        speechStatus={speechStatus}
-        speechSupported={speechSupported}
-        stopWarning={stopWarning}
-      />
-    </section>
-  );
-}
+    <FullscreenContainer>
+      {/* ── Fullscreen webcam ── */}
+      <WebcamContainer>
+        <VideoFrame $isRunning={running} className={mirroredRef.current ? "is-mirrored" : ""}>
+          <video ref={videoRef} autoPlay muted playsInline aria-label="카메라 영상" />
+          <canvas ref={canvasRef} aria-hidden="true" />
+          {!running && (
+            <EmptyState>
+              <ScanLine size={48} aria-hidden="true" />
+              <span>카메라 시작 전</span>
+            </EmptyState>
+          )}
+        </VideoFrame>
+      </WebcamContainer>
 
-type CameraPanelProps = {
-  canvasRef: RefObject<HTMLCanvasElement | null>;
-  detected: boolean;
-  fps: number;
-  onThresholdChange: (threshold: number) => void;
-  personCount: number;
-  running: boolean;
-  startCamera: () => void;
-  status: string;
-  stopCamera: () => void;
-  threshold: number;
-  videoRef: RefObject<HTMLVideoElement | null>;
-};
-
-function CameraPanel({
-  canvasRef,
-  detected,
-  fps,
-  onThresholdChange,
-  personCount,
-  running,
-  startCamera,
-  status,
-  stopCamera,
-  threshold,
-  videoRef,
-}: CameraPanelProps) {
-  return (
-    <div className="panel camera-panel">
-      <div className="panel-header">
-        <div>
-          <p className="panel-kicker">Camera detection</p>
-          <h2>보행자 인식 화면</h2>
-        </div>
-        <span className={`live-pill ${running ? "is-live" : ""}`}>
-          <Radio size={14} aria-hidden="true" />
-          {running ? "LIVE" : "STANDBY"}
-        </span>
-      </div>
-
-      <div className="video-frame is-mirrored">
-        <video ref={videoRef} autoPlay muted playsInline aria-label="카메라 영상" />
-        <canvas ref={canvasRef} aria-hidden="true" />
-        {!running && (
-          <div className="camera-placeholder">
-            <ScanLine size={36} aria-hidden="true" />
-            <span>카메라 시작 전</span>
-          </div>
-        )}
-      </div>
-
-      <div className="control-row">
-        <button type="button" className="icon-button primary" onClick={startCamera} disabled={running}>
-          <Camera size={16} aria-hidden="true" />
-          카메라 시작
-        </button>
-        <button type="button" className="icon-button secondary" onClick={stopCamera} disabled={!running}>
-          <Square size={16} aria-hidden="true" />
-          정지
-        </button>
-      </div>
-
-      <p className="system-status" aria-live="polite">
-        {status}
-      </p>
-
-      <div className="telemetry-grid" aria-label="감지 상태">
-        <TelemetryItem icon={<Users size={16} aria-hidden="true" />} label="감지 인원" value={personCount} />
-        <TelemetryItem icon={<Eye size={16} aria-hidden="true" />} label="사람 감지" value={detected ? "감지됨" : "없음"} />
-        <TelemetryItem icon={<Gauge size={16} aria-hidden="true" />} label="추론 FPS" value={fps} />
-      </div>
-
-      <label className="range-control">
-        <span>감지 신뢰도 임계값</span>
-        <strong>{threshold.toFixed(2)}</strong>
-        <input
-          type="range"
-          min={0.2}
-          max={0.9}
-          step={0.05}
-          value={threshold}
-          onChange={(e) => onThresholdChange(parseFloat(e.target.value))}
-        />
-      </label>
-    </div>
-  );
-}
-
-function TelemetryItem({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
-  return (
-    <div className="telemetry-item">
-      {icon}
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function VehicleSignalPanel({
-  carSignal,
-  pedestrianSignal,
-}: {
-  carSignal: Signal;
-  pedestrianSignal: Signal;
-}) {
-  return (
-    <div className="panel signal-panel" data-car-signal={carSignal} data-pedestrian-signal={pedestrianSignal}>
-      <div className="panel-header">
-        <div>
-          <p className="panel-kicker">Vehicle signal</p>
-          <h2>자동차용 신호등</h2>
-        </div>
-        <span className={`signal-chip ${SIGNAL_TONE[carSignal]}`}>{CAR_LABEL[carSignal]}</span>
-      </div>
-
-      <div className="car-signal-wrap">
-        <div className="car-signal-header">
-          <CarFront size={24} aria-hidden="true" />
+      {/* ── Vehicle Signal — Top Right ── */}
+      <SignalOverlay>
+        <OverlaySectionLabel>
+          <CarFront aria-hidden="true" />
           <span>차량 신호</span>
-        </div>
-        <div className="traffic-light vehicle" aria-label={`현재 자동차용 신호등: ${CAR_LABEL[carSignal]}`}>
-          <SignalLamp color="red" label="R" active={carSignal === "R"} />
-          <SignalLamp color="yellow" label="Y" active={carSignal === "Y"} />
-          <SignalLamp color="green" label="G" active={carSignal === "G"} />
-        </div>
-        <div className="vehicle-led-board" role="status" aria-label="차량 운전자 안내: 사회적 약자가 지나가고있어요">
+          <StatusPill
+            $variant={carSignal === "R" ? "red" : carSignal === "Y" ? "yellow" : "green"}
+            style={{ marginLeft: "auto" }}
+          >
+            {CAR_LABEL[carSignal]}
+          </StatusPill>
+        </OverlaySectionLabel>
+
+        <LampRow>
+          <SignalLampGlass $color="red" $active={carSignal === "R"}>
+            R
+          </SignalLampGlass>
+          <SignalLampGlass $color="yellow" $active={carSignal === "Y"}>
+            Y
+          </SignalLampGlass>
+          <SignalLampGlass $color="green" $active={carSignal === "G"}>
+            G
+          </SignalLampGlass>
+        </LampRow>
+
+        <LedBoard>
           <ShieldAlert size={16} aria-hidden="true" />
           <span>사회적 약자가 지나가고있어요</span>
-        </div>
-        <div className="pedestrian-signal" aria-label={`현재 보행자용 신호등: ${PEDESTRIAN_LABEL[pedestrianSignal]}`}>
-          <div className="pedestrian-signal-header">
-            <Users size={16} aria-hidden="true" />
-            <span>보행자용 신호등</span>
-            <strong className={SIGNAL_TONE[pedestrianSignal]}>{PEDESTRIAN_LABEL[pedestrianSignal]}</strong>
-          </div>
-          <div className="pedestrian-lightbar">
-            <SignalLamp color="red" label="보행 정지" active={pedestrianSignal === "R"} />
-            <SignalLamp color="yellow" label="보행 주의" active={pedestrianSignal === "Y"} />
-            <SignalLamp color="green" label="보행 가능" active={pedestrianSignal === "G"} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+        </LedBoard>
 
-function SignalLamp({ active, color, label }: { active: boolean; color: string; label: string }) {
-  return (
-    <div className={`lamp ${color} ${active ? "on" : ""}`}>
-      <span className="sr-only">{label}</span>
-    </div>
-  );
-}
+        <PedestrianInfo>
+          <Users aria-hidden="true" />
+          <span>보행자: </span>
+          <strong className={SIGNAL_TONE[pedestrianSignal]}>{PEDESTRIAN_LABEL[pedestrianSignal]}</strong>
+        </PedestrianInfo>
+      </SignalOverlay>
 
-type WarningPanelProps = {
-  speakWarning: () => void;
-  speaking: boolean;
-  speechStatus: string;
-  speechSupported: boolean;
-  stopWarning: () => void;
-};
+      {/* ── TTS — Top Left ── */}
+      <TTSOverlay className={speaking ? "is-speaking" : ""}>
+        <TTSHeader>
+          <Megaphone aria-hidden="true" />
+          <h3>건너지마세요 경고 방송</h3>
+        </TTSHeader>
 
-function WarningPanel({
-  speakWarning,
-  speaking,
-  speechStatus,
-  speechSupported,
-  stopWarning,
-}: WarningPanelProps) {
-  return (
-    <div className={`panel warning-panel ${speaking ? "is-speaking" : ""}`}>
-      <div className="panel-header">
-        <div>
-          <p className="panel-kicker">Pedestrian TTS</p>
-          <h2>건너지마세요 경고 방송</h2>
-        </div>
-        <Megaphone size={22} aria-hidden="true" />
-      </div>
+        <WarningContent>
+          <div className="stop-badge">STOP</div>
+          <h2>건너지마세요</h2>
+          <p>지금 건너면 위험합니다. 뒤로 물러나세요.</p>
+        </WarningContent>
 
-      <div className="warning-copy">
-        <span className="warning-led">STOP</span>
-        <strong>건너지마세요</strong>
-        <p>지금 건너면 위험합니다. 뒤로 물러나세요.</p>
-      </div>
+        <ButtonRow>
+          <StyledButton $variant="danger" onClick={speakWarning} disabled={!speechSupported}>
+            <Volume2 size={16} aria-hidden="true" />
+            경고 방송 재생
+          </StyledButton>
+          <StyledButton onClick={stopWarning} disabled={!speechSupported || !speaking}>
+            <VolumeX size={16} aria-hidden="true" />
+            방송 중지
+          </StyledButton>
+        </ButtonRow>
 
-      <div className="control-row">
-        <button type="button" className="icon-button danger" onClick={speakWarning} disabled={!speechSupported}>
-          <Volume2 size={16} aria-hidden="true" />
-          경고 방송 재생
-        </button>
-        <button type="button" className="icon-button secondary" onClick={stopWarning} disabled={!speechSupported || !speaking}>
-          <VolumeX size={16} aria-hidden="true" />
-          방송 중지
-        </button>
-      </div>
+        <StatusLine>
+          <Activity aria-hidden="true" />
+          <span>{speechSupported ? speechStatus : "이 브라우저는 TTS를 지원하지 않습니다."}</span>
+        </StatusLine>
+      </TTSOverlay>
 
-      <p className="system-status" aria-live="polite">
-        <Activity size={14} aria-hidden="true" />
-        {speechSupported ? speechStatus : "이 브라우저는 TTS를 지원하지 않습니다."}
-      </p>
-    </div>
+      {/* ── Control Bar — Bottom Center ── */}
+      <ControlBar>
+        <StyledButton $variant="primary" onClick={startCamera} disabled={running}>
+          <Camera size={16} aria-hidden="true" />
+          카메라 시작
+        </StyledButton>
+        <StyledButton $variant="danger" onClick={stopCamera} disabled={!running}>
+          <Square size={16} aria-hidden="true" />
+          정지
+        </StyledButton>
+
+        <StatusPill $variant={running ? "live" : "neutral"}>
+          <Radio size={12} aria-hidden="true" />
+          {running ? "LIVE" : "STANDBY"}
+        </StatusPill>
+
+        <div aria-hidden style={{ width: 1, height: 20, background: "rgba(255,255,255,0.08)" }} />
+
+        <TelemetryGridGlass>
+          <TelemetryItemGlass>
+            <Users aria-hidden="true" />
+            <span>인원 </span>
+            <strong>{personCount}</strong>
+          </TelemetryItemGlass>
+          <TelemetryItemGlass>
+            <Eye aria-hidden="true" />
+            <span>감지 </span>
+            <strong>{detected ? "감지됨" : "없음"}</strong>
+          </TelemetryItemGlass>
+          <TelemetryItemGlass>
+            <Gauge aria-hidden="true" />
+            <span>FPS </span>
+            <strong>{fps}</strong>
+          </TelemetryItemGlass>
+        </TelemetryGridGlass>
+
+        <ThresholdSlider>
+          <span>신뢰도</span>
+          <input
+            type="range"
+            min={0.2}
+            max={0.9}
+            step={0.05}
+            value={threshold}
+            onChange={(e) => setThreshold(parseFloat(e.target.value))}
+          />
+          <strong>{threshold.toFixed(2)}</strong>
+        </ThresholdSlider>
+
+        <StatusText>{status}</StatusText>
+      </ControlBar>
+    </FullscreenContainer>
   );
 }
