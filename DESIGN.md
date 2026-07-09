@@ -2,7 +2,7 @@
 
 ## 1. Atmosphere & Identity
 
-Halo Signal is a compact traffic-signal device surface. The signature is a dark, automotive-grade control board where the car signal, pedestrian warning board, and camera feed read as live hardware, not as an explanatory landing page. The interface should feel precise, urgent, and calm under pressure.
+Halo Signal is a compact traffic-signal device surface. The signature is a dark, automotive-grade control board where the car signal, pedestrian signal, warning board, and camera feed read as live hardware, not as an explanatory landing page. The interface should feel precise, urgent, and calm under pressure.
 
 ## 2. Color
 
@@ -81,8 +81,16 @@ All spacing derives from a base of 4px.
 ### Grid
 
 - Max content width: 1360px.
-- Main workspace: three-column laptop demo grid so camera, horizontal car signal housing, and TTS warning board are visible together at 1366x768.
+- Main workspace: three-column laptop demo grid so camera, horizontal car signal housing, pedestrian signal housing, and TTS warning board are visible together at 1366x768.
 - Mobile: single-column stack with signal first.
+
+### Signal Matrix
+
+| Car signal | Pedestrian signal | Behavior |
+|------------|-------------------|----------|
+| `R` | `G` | 보행 가능, 차량 정지 |
+| `Y` | `Y` | 보행 주의, 자동 TTS 즉시 재생 |
+| `G` | `R` | 차량 진행, 보행자 정지 |
 
 ## 5. Components
 
@@ -110,9 +118,16 @@ All spacing derives from a base of 4px.
 - **Accessibility**: current signal duplicated as text.
 - **Motion**: lamp glow and scale only.
 
+### Pedestrian Traffic Light
+- **Structure**: compact horizontal three-lamp housing below the car light.
+- **Variants**: red stop, yellow caution, green walk.
+- **Logic**: derived from the car signal only, never independently mutated.
+- **Accessibility**: current pedestrian signal duplicated as text.
+- **Motion**: lamp glow and scale only.
+
 ### TTS Warning Console
 - **Structure**: red warning board, one compact fatality line, and speak/stop controls.
-- **Variants**: ready, speaking, unsupported.
+- **Variants**: ready, speaking, unsupported, auto-triggered on pedestrian yellow.
 - **Spacing**: `--space-4` internal grid.
 - **States**: speaking live region, disabled unsupported controls.
 - **Accessibility**: uses `aria-live` for speech status and visible text equivalent.

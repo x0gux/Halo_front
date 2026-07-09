@@ -357,7 +357,7 @@ code {
   position: relative;
   display: grid;
   justify-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .car-signal-header {
@@ -470,6 +470,74 @@ code {
     radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.72), transparent 22%),
     var(--signal-green);
   box-shadow: 0 0 46px rgba(48, 209, 88, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.25);
+}
+
+.pedestrian-signal {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: rgba(8, 9, 10, 0.45);
+}
+
+.pedestrian-signal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 590;
+}
+
+.pedestrian-signal-header svg {
+  color: var(--accent-hover);
+}
+
+.pedestrian-signal-header strong {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 590;
+}
+
+.pedestrian-signal-header strong.red {
+  color: var(--signal-red);
+}
+
+.pedestrian-signal-header strong.yellow {
+  color: var(--signal-yellow);
+}
+
+.pedestrian-signal-header strong.green {
+  color: var(--signal-green);
+}
+
+.pedestrian-lightbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: min(230px, 100%);
+  justify-self: center;
+  padding: var(--space-2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 20%),
+    linear-gradient(145deg, #1b1e24, #060708 72%);
+  box-shadow: inset 0 -18px 32px rgba(0, 0, 0, 0.45);
+}
+
+.pedestrian-lightbar .lamp {
+  width: min(52px, 100%);
+}
+
+.pedestrian-lightbar .lamp::before {
+  inset: -7px -9px 52%;
 }
 
 .vulnerable-notice {
@@ -653,6 +721,28 @@ code {
   .lamp {
     width: min(78px, 100%);
     font-size: 0.6875rem;
+  }
+
+  .pedestrian-signal {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .pedestrian-signal-header {
+    font-size: 0.75rem;
+  }
+
+  .pedestrian-signal-header strong {
+    font-size: 0.6875rem;
+  }
+
+  .pedestrian-lightbar {
+    width: min(210px, 100%);
+    padding: 6px;
+  }
+
+  .pedestrian-lightbar .lamp {
+    width: min(42px, 100%);
   }
 
   .vulnerable-notice {

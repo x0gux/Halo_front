@@ -27,11 +27,13 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-
-type Signal = "R" | "Y" | "G";
-
-const CYCLE_MS = 10000;
-const CLEAR_GRACE_MS = 2000;
+import {
+  getNextTrafficPhase,
+  getPedestrianSignal,
+  shouldAutoSpeakOnPedestrianSignalChange,
+  type PedestrianSignal,
+  type Signal,
+} from "./signalLogic";
 
 const PEDESTRIAN_FATALITIES = 926;
 
@@ -42,6 +44,18 @@ const SIGNAL_LABEL: Record<Signal, string> = {
 };
 
 const SIGNAL_TONE: Record<Signal, string> = {
+  R: "red",
+  Y: "yellow",
+  G: "green",
+};
+
+const PEDESTRIAN_LABEL: Record<PedestrianSignal, string> = {
+  R: "보행자 정지",
+  Y: "보행 주의",
+  G: "보행 가능",
+};
+
+const PEDESTRIAN_TONE: Record<PedestrianSignal, string> = {
   R: "red",
   Y: "yellow",
   G: "green",
@@ -87,6 +101,7 @@ export default function TrafficLightDetector() {
   const lastSeenRef = useRef(0);
   const lastFrameRef = useRef(0);
   const lastPostedRef = useRef<Signal | null>(null);
+  const lastPedestrianSignalRef = useRef<PedestrianSignal>("G");
   const mirroredRef = useRef(true);
 
   const [status, setStatus] = useState("COCO-SSD 모델 로딩 중");
@@ -113,6 +128,34 @@ export default function TrafficLightDetector() {
   );
 
   const detected = personCount > 0;
+  const pedestrianSignal = getPedestrianSignal(signal);
+
+  const speakWarning = useCallback(() => {
+    if (!speechSupported) {
+      setSpeechStatus("이 브라우저는 TTS를 지원하지 않습니다.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(warningMessage);
+    utterance.lang = "ko-KR";
+    utterance.rate = 1.08;
+    utterance.pitch = 0.82;
+    utterance.volume = 1;
+    utterance.onstart = () => {
+      setSpeaking(true);
+      setSpeechStatus("경고 방송 송출 중");
+    };
+    utterance.onend = () => {
+      setSpeaking(false);
+      setSpeechStatus("경고 방송 완료");
+    };
+    utterance.onerror = () => {
+      setSpeaking(false);
+      setSpeechStatus("경고 방송 실패. 브라우저 음성 권한을 확인하세요.");
+    };
+    window.speechSynthesis.speak(utterance);
+  }, [speechSupported, warningMessage]);
 
   const postSignal = useCallback((sig: Signal) => {
     if (lastPostedRef.current === sig) return;
@@ -128,37 +171,37 @@ export default function TrafficLightDetector() {
 
   const applySignal = useCallback(
     (sig: Signal) => {
+      const previousPedestrianSignal = lastPedestrianSignalRef.current;
+      const nextPedestrianSignal = getPedestrianSignal(sig);
+
       signalRef.current = sig;
       setSignal(sig);
       postSignal(sig);
+
+      if (shouldAutoSpeakOnPedestrianSignalChange(previousPedestrianSignal, nextPedestrianSignal)) {
+        speakWarning();
+      }
+
+      lastPedestrianSignalRef.current = nextPedestrianSignal;
     },
-    [postSignal]
+    [postSignal, speakWarning]
   );
 
   const updateStateMachine = useCallback(
     (personPresent: boolean, now: number) => {
-      const cur = signalRef.current;
+      const next = getNextTrafficPhase({
+        signal: signalRef.current,
+        phaseStart: phaseStartRef.current,
+        lastSeen: lastSeenRef.current,
+        personPresent,
+        now,
+      });
 
-      if (cur === "G") {
-        if (now - phaseStartRef.current >= CYCLE_MS) {
-          if (personPresent) {
-            applySignal("Y");
-            lastSeenRef.current = now;
-          } else {
-            applySignal("R");
-            phaseStartRef.current = now;
-          }
-        }
-      } else if (cur === "R") {
-        if (now - phaseStartRef.current >= CYCLE_MS) {
-          applySignal("G");
-          phaseStartRef.current = now;
-        }
-      } else if (personPresent) {
-        lastSeenRef.current = now;
-      } else if (now - lastSeenRef.current >= CLEAR_GRACE_MS) {
-        applySignal("R");
-        phaseStartRef.current = now;
+      phaseStartRef.current = next.phaseStart;
+      lastSeenRef.current = next.lastSeen;
+
+      if (next.signal !== signalRef.current) {
+        applySignal(next.signal);
       }
     },
     [applySignal]
@@ -270,33 +313,6 @@ export default function TrafficLightDetector() {
     setStatus("정지됨. 차량 신호는 안전 기본값 R로 전송됩니다.");
   }, [applySignal]);
 
-  const speakWarning = useCallback(() => {
-    if (!speechSupported) {
-      setSpeechStatus("이 브라우저는 TTS를 지원하지 않습니다.");
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(warningMessage);
-    utterance.lang = "ko-KR";
-    utterance.rate = 1.08;
-    utterance.pitch = 0.82;
-    utterance.volume = 1;
-    utterance.onstart = () => {
-      setSpeaking(true);
-      setSpeechStatus("경고 방송 송출 중");
-    };
-    utterance.onend = () => {
-      setSpeaking(false);
-      setSpeechStatus("경고 방송 완료");
-    };
-    utterance.onerror = () => {
-      setSpeaking(false);
-      setSpeechStatus("경고 방송 실패. 브라우저 음성 권한을 확인하세요.");
-    };
-    window.speechSynthesis.speak(utterance);
-  }, [speechSupported, warningMessage]);
-
   const stopWarning = useCallback(() => {
     if (!speechSupported) return;
     window.speechSynthesis.cancel();
@@ -342,7 +358,7 @@ export default function TrafficLightDetector() {
         threshold={threshold}
         videoRef={videoRef}
       />
-      <VehicleSignalPanel signal={signal} />
+      <VehicleSignalPanel pedestrianSignal={pedestrianSignal} signal={signal} />
       <WarningPanel
         riskStats={riskStats}
         speakWarning={speakWarning}
@@ -453,9 +469,15 @@ function TelemetryItem({ icon, label, value }: { icon: ReactNode; label: string;
   );
 }
 
-function VehicleSignalPanel({ signal }: { signal: Signal }) {
+function VehicleSignalPanel({
+  pedestrianSignal,
+  signal,
+}: {
+  pedestrianSignal: PedestrianSignal;
+  signal: Signal;
+}) {
   return (
-    <div className="panel signal-panel">
+    <div className="panel signal-panel" data-car-signal={signal} data-pedestrian-signal={pedestrianSignal}>
       <div className="panel-header">
         <div>
           <p className="panel-kicker">Vehicle signal</p>
@@ -473,6 +495,18 @@ function VehicleSignalPanel({ signal }: { signal: Signal }) {
           <SignalLamp color="red" label="R" active={signal === "R"} />
           <SignalLamp color="yellow" label="Y" active={signal === "Y"} />
           <SignalLamp color="green" label="G" active={signal === "G"} />
+        </div>
+        <div className="pedestrian-signal" aria-label={`현재 보행자용 신호등: ${PEDESTRIAN_LABEL[pedestrianSignal]}`}>
+          <div className="pedestrian-signal-header">
+            <Users size={16} aria-hidden="true" />
+            <span>보행자용 신호등</span>
+            <strong className={PEDESTRIAN_TONE[pedestrianSignal]}>{PEDESTRIAN_LABEL[pedestrianSignal]}</strong>
+          </div>
+          <div className="pedestrian-lightbar">
+            <SignalLamp color="red" label="보행 정지" active={pedestrianSignal === "R"} />
+            <SignalLamp color="yellow" label="보행 주의" active={pedestrianSignal === "Y"} />
+            <SignalLamp color="green" label="보행 가능" active={pedestrianSignal === "G"} />
+          </div>
         </div>
         <div className="vulnerable-notice">
           <ShieldAlert size={18} aria-hidden="true" />
